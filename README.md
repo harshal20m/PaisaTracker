@@ -2,7 +2,8 @@
 
 A simple and intuitive expense tracker app for Android, built with modern Android development practices. This app helps you manage your finances by organizing expenses into projects, providing clear visualizations and easy data export options.
 
-![image](https://github.com/user-attachments/assets/e1744158-9634-4b95-a764-153b34b12c01)
+![image]()
+
 
 
 ## ✨ Features
@@ -30,7 +31,7 @@ A simple and intuitive expense tracker app for Android, built with modern Androi
 
 1.  **Clone the repository**:
     ```sh
-    git clone https://github.com/your-username/PaisaTracker.git
+    git clone https://github.com/harshal20m/Expense-Tracker-Kotlin.git
     ```
 2.  **Open in Android Studio**:
     - Open Android Studio and select `File > Open`.
