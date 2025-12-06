@@ -2,9 +2,9 @@
 
 A simple and intuitive expense tracker app for Android, built with modern Android development practices. This app helps you manage your finances by organizing expenses into projects, providing clear visualizations and easy data export options.
 
-![image](https://github.com/harshal20m/Expense-Tracker-Kotlin/blob/master/src/main/res/drawable/expenses_5501391.png)
-
-
+<p align="center">
+  <img src="https://github.com/harshal20m/Expense-Tracker-Kotlin/raw/master/src/main/res/drawable/expenses_5501391.png" width="300" alt="PaisaTracker Banner">
+</p>
 
 ## ✨ Features
 
@@ -27,6 +27,20 @@ A simple and intuitive expense tracker app for Android, built with modern Androi
 - **Charting**: [MPAndroidChart](https://github.com/PhilJay/MPAndroidChart) for creating beautiful and interactive charts.
 - **Data Export**: Utilizes [OpenCSV](http://opencsv.sourceforge.net/) and [iTextPDF](https://itextpdf.com/) for data export functionality.
 
+## 🏛️ Architecture
+
+This app follows the **MVVM (Model-View-ViewModel)** architecture pattern. This design separates the UI from the business logic, making the code cleaner, easier to maintain, and more testable.
+
+```mermaid
+graph TD
+    A[UI / View <br> (Jetpack Compose)] -- User Actions --> B[ViewModel];
+    B -- Observes State --> A;
+    B -- Calls --> C[Repository];
+    C -- Returns Data --> B;
+    C -- Accesses --> D[Data Source <br> (Room Database)];
+    D -- Provides Data --> C;
+```
+
 ## 🚀 Getting Started
 
 1.  **Clone the repository**:
@@ -48,4 +62,3 @@ Contributions are welcome! If you have suggestions for improvements or want to f
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
