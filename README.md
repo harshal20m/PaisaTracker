@@ -2,7 +2,7 @@
 
 A simple and intuitive expense tracker app for Android, built with modern Android development practices. This app helps you manage your finances by organizing expenses into projects, providing clear visualizations and easy data export options.
 
-![image]()
+![image](https://github.com/harshal20m/Expense-Tracker-Kotlin/blob/master/src/main/res/drawable/expenses_5501391.png)
 
 
 
