@@ -52,6 +52,8 @@
 <p align="center">
   <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Notification_settings_modal.jpg" width="200" alt="Notifications">
   <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Battery_settings_modal.jpg" width="200" alt="Battery Settings">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Lock_Screen.jpg" width="200" alt="Lock Screen">
+  
 </p>
 
 ---
