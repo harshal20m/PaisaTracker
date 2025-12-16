@@ -15,7 +15,6 @@ import com.example.paisatracker.ui.expense.ExpenseListScreen
 import com.example.paisatracker.ui.export.ExportScreen
 import com.example.paisatracker.ui.main.ProjectListScreen
 import com.example.paisatracker.ui.settings.SettingsScreen
-
 @Composable
 fun AppNavigation(navController: NavHostController, viewModel: PaisaTrackerViewModel, modifier: Modifier = Modifier) {
     NavHost(navController, startDestination = "projects", modifier = modifier) {
@@ -42,7 +41,6 @@ fun AppNavigation(navController: NavHostController, viewModel: PaisaTrackerViewM
             )
         }
 
-
         composable("expense_list/{categoryId}") { backStackEntry ->
             val categoryId = backStackEntry.arguments?.getString("categoryId")?.toLong() ?: return@composable
             ExpenseListScreen(
@@ -53,7 +51,7 @@ fun AppNavigation(navController: NavHostController, viewModel: PaisaTrackerViewM
         }
 
         composable("settings") {
-            SettingsScreen(viewModel = viewModel)
+            SettingsScreen(viewModel = viewModel, navController = navController)
         }
 
         composable("project_insights/{projectId}") { backStackEntry ->

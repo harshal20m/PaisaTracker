@@ -308,6 +308,70 @@ fun AboutBottomSheet(onDismiss: () -> Unit) {
                 }
             }
 
+            // Community Section - NEW
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                ),
+                shape = RoundedCornerShape(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            "🌐",
+                            fontSize = 22.sp
+                        )
+                        Column {
+                            Text(
+                                "Join Our Community",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                "Get updates, support & contribute",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Community platforms
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        CommunityButton(
+                            iconRes = R.drawable.ic_discord,
+                            label = "Discord",
+                            subtitle = "Join Server",
+                            onClick = {
+                                openUrl(context, "https://discord.gg/kmaqH8CSFD") // Replace with your Discord invite link
+                            }
+                        )
+
+                        CommunityButton(
+                            iconRes = R.drawable.ic_telegram,
+                            label = "Telegram",
+                            subtitle = "Join Channel",
+                            onClick = {
+                                openTelegram(context, "https://t.me/paisatrackercommunity") // Replace with your Telegram username/channel
+                            }
+                        )
+                    }
+                }
+            }
+
             // Features Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -452,18 +516,77 @@ private fun SocialIconButton(
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
-        // Smaller icon
         Image(
             painter = painterResource(id = iconRes),
             contentDescription = label,
             modifier = Modifier
-                .size(30.dp) // Reduced from 56.dp
-                .clip(RoundedCornerShape(0.dp)), // Reduced corner radius
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp)),
             contentScale = ContentScale.Fit
+        )
+
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }
 
+@Composable
+private fun CommunityButton(
+    iconRes: Int,
+    label: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = label,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Fit
+            )
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
 
 @Composable
 private fun FeatureItem(text: String) {
@@ -548,5 +671,16 @@ private fun openEmail(context: Context, email: String) {
         context.startActivity(Intent.createChooser(intent, "Send Email"))
     } catch (e: Exception) {
         Toast.makeText(context, "No email app found", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun openTelegram(context: Context, channelUsername: String) {
+    try {
+        // Try to open Telegram app first
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("tg://resolve?domain=$channelUsername"))
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        // Fallback to web
+        openUrl(context, "https://t.me/$channelUsername")
     }
 }

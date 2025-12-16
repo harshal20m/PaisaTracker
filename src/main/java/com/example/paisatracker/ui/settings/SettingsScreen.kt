@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,16 +24,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.paisatracker.PaisaTrackerViewModel
 import com.example.paisatracker.data.AppLockPreferences
 import com.example.paisatracker.ui.applock.SetupPinDialog
 import com.example.paisatracker.ui.applock.AppLockSettingsDialog
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.content.FileProvider
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: PaisaTrackerViewModel) {
+fun SettingsScreen(
+    viewModel: PaisaTrackerViewModel,
+    navController: NavHostController
+) {
     val context = LocalContext.current
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showBatteryDialog by remember { mutableStateOf(false) }
@@ -147,14 +154,33 @@ fun SettingsScreen(viewModel: PaisaTrackerViewModel) {
                     title = "Share App",
                     subtitle = "Invite friends to track expenses",
                     onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "Check out PaisaTracker app for expense management!")
+                        try {
+                            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                            val apkPath = packageInfo.applicationInfo?.sourceDir
+                            val apkFile = File(apkPath)
+
+                            val apkUri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                apkFile
+                            )
+
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/vnd.android.package-archive"
+                                putExtra(Intent.EXTRA_STREAM, apkUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra(Intent.EXTRA_SUBJECT, "PaisaTracker App")
+                                putExtra(Intent.EXTRA_TEXT, "Check out PaisaTracker - Your Personal Expense Tracker!")
+                            }
+
+                            context.startActivity(Intent.createChooser(shareIntent, "Share PaisaTracker APK"))
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Unable to share APK: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share via"))
                     }
                 )
             }
+
 
             // Data & Privacy Section
             item {
@@ -166,11 +192,21 @@ fun SettingsScreen(viewModel: PaisaTrackerViewModel) {
                 SettingsCard(
                     icon = Icons.Default.CloudUpload,
                     title = "Backup & Restore",
-                    subtitle = "Cloud backup",
-                    enabled = false,
-                    onClick = {}
+                    subtitle = "Export and import your data",
+                    enabled = true,
+                    onClick = {
+                        // Clear the back stack to the start destination
+                        navController.navigate("export") {
+                            popUpTo("projects") {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
+
 
             // App Lock Card
             item {

@@ -14,4 +14,9 @@
     <external-files-path
         name="external_files"
         path="/" />
+
+    <external-path name="external_files" path="." />
+    <cache-path name="cache" path="." />
+    <files-path name="files" path="." />
+    <root-path name="root" path="." />
 </paths>
