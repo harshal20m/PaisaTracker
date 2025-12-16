@@ -29,29 +29,29 @@
 ## 📱 Screenshots
 
 <p align="center">
-  <img src="screenshots/Home_page.jpg" width="200" alt="Home">
-  <img src="screenshots/Create_Project.jpg" width="200" alt="Create Project">
-  <img src="screenshots/Expenses_page.jpg" width="200" alt="Expenses">
-  <img src="screenshots/Create_Expense.jpg" width="200" alt="Add Expense">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Home_page.jpg" width="200" alt="Home">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Create_Project.jpg" width="200" alt="Create Project">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Expenses_page.jpg" width="200" alt="Expenses">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Create_Expense.jpg" width="200" alt="Add Expense">
 </p>
 
 <p align="center">
-  <img src="screenshots/Insights_page.jpg" width="200" alt="Insights">
-  <img src="screenshots/Category_page.jpg" width="200" alt="Categories">
-  <img src="screenshots/Create_Category.jpg" width="200" alt="Create Category">
-  <img src="screenshots/Assets_Gallery.jpg" width="200" alt="Assets">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Insights_page.jpg" width="200" alt="Insights">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Category_page.jpg" width="200" alt="Categories">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Create_Category.jpg" width="200" alt="Create Category">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Assets_Gallary.jpg" width="200" alt="Assets">
 </p>
 
 <p align="center">
-  <img src="screenshots/Export.jpg" width="200" alt="Export">
-  <img src="screenshots/Settings.jpg" width="200" alt="Settings">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Export.jpg" width="200" alt="Export">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Settings.jpg" width="200" alt="Settings">
   <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/About_modal.jpg" width="200" alt="About">
-  <img src="screenshots/AppLock_modal.jpg" width="200" alt="App Lock">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/AppLock_modal.jpg" width="200" alt="App Lock">
 </p>
 
 <p align="center">
-  <img src="screenshots/Notification_settings_modal.jpg" width="200" alt="Notifications">
-  <img src="screenshots/Battery_settings_modal.jpg" width="200" alt="Battery Settings">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Notification_settings_modal.jpg" width="200" alt="Notifications">
+  <img src="https://github.com/harshal20m/PaisaTracker/blob/master/src/main/res/screenshots/Battery_settings_modal.jpg" width="200" alt="Battery Settings">
 </p>
 
 ---
