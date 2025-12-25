@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.amazon.com/dp/YOUR_APP_ID">
+  <a href="https://www.amazon.com/dp/B0G7LNNBVM">
     <img src="https://images-na.ssl-images-amazon.com/images/G/01/mobile-apps/devportal2/res/images/amazon-appstore-badge-english-black.png" width="200" alt="Available on Amazon Appstore">
   </a>
 </p>
