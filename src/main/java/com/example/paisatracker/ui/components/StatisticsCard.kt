@@ -8,6 +8,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.paisatracker.ui.theme.PaisaTrackerTheme
+import com.example.paisatracker.util.formatCurrency
 import java.text.NumberFormat
 import java.util.*
 
@@ -207,7 +210,7 @@ private fun TrendIndicator(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+            imageVector = if (isPositive) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = trendColor
@@ -295,16 +298,6 @@ data class StatisticItem(
 // UTILITY FUNCTIONS
 // ============================================================================
 
-/**
- * Format currency value with proper formatting
- */
-private fun formatCurrency(value: Double, symbol: String): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = 2
-    return "$symbol ${formatter.format(value)}"
-}
-
 // ============================================================================
 // PREVIEWS
 // ============================================================================
@@ -323,7 +316,7 @@ private fun StatisticsCardPreview() {
                 StatisticsCard(
                     title = "Total Spent",
                     value = 45678.50,
-                    icon = Icons.Default.TrendingUp,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
                     trend = 12.5,
                     trendLabel = "vs last month",
                     cardColor = StatisticsCardColor.Primary
@@ -356,14 +349,14 @@ private fun CompactStatisticsCardPreview() {
                 CompactStatisticsCard(
                     title = "Income",
                     value = 50000.0,
-                    icon = Icons.Default.TrendingUp,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
                     modifier = Modifier.weight(1f)
                 )
                 
                 CompactStatisticsCard(
                     title = "Expenses",
                     value = 35000.0,
-                    icon = Icons.Default.TrendingDown,
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -397,7 +390,7 @@ private fun StatisticsCardDarkPreview() {
             StatisticsCard(
                 title = "Total Spent",
                 value = 45678.50,
-                icon = Icons.Default.TrendingUp,
+                icon = Icons.AutoMirrored.Filled.TrendingUp,
                 trend = 12.5,
                 trendLabel = "vs last month",
                 cardColor = StatisticsCardColor.Warning,

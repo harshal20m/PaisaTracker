@@ -1,6 +1,7 @@
 package com.example.paisatracker.ui.salary
 
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.paisatracker.data.BankAccount
@@ -27,6 +28,7 @@ import java.util.Calendar
  * Supports multiple income sources per month (e.g., primary job + freelance).
  * Each salary is linked to a specific bank account and can have different source types.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class SalaryViewModel(
     private val repository: PaisaTrackerRepository,
     private val globalViewModel: PaisaTrackerViewModel

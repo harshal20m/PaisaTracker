@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -929,7 +931,7 @@ fun AddSalarySheet(
                 minLines = 2,
                 maxLines = 3,
                 leadingIcon = {
-                    Icon(Icons.Default.Notes, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null)
                 }
             )
 
@@ -1017,7 +1019,7 @@ fun AddSalarySheet(
                                 )
                             }
                             Icon(
-                                Icons.Default.ArrowForward,
+                                Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.tertiary
                             )
@@ -1553,7 +1555,7 @@ fun EditSalarySheet(
                 onValueChange = { note = it },
                 label = { Text("Note (Optional)") },
                 placeholder = { Text("Add a note") },
-                leadingIcon = { Icon(Icons.Default.Notes, null) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 maxLines = 3

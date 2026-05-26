@@ -18,11 +18,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -36,7 +36,7 @@ import com.example.paisatracker.PaisaTrackerViewModel
 
 @Composable
 fun CalculatorTab(viewModel: PaisaTrackerViewModel) {
-    val showHistory by viewModel.calcShowHistory.collectAsState()
+    val showHistory by viewModel.calcShowHistory.collectAsStateWithLifecycle()
 
     AnimatedContent(
         targetState = showHistory,
@@ -62,9 +62,9 @@ fun CalculatorTab(viewModel: PaisaTrackerViewModel) {
 // ── Main calculator screen (display + keypad) ────────────────────────────────
 @Composable
 private fun CalculatorMainScreen(viewModel: PaisaTrackerViewModel) {
-    val display    by viewModel.calcDisplay.collectAsState()
-    val expression by viewModel.calcExpression.collectAsState()
-    val history    by viewModel.calcHistory.collectAsState()
+    val display    by viewModel.calcDisplay.collectAsStateWithLifecycle()
+    val expression by viewModel.calcExpression.collectAsStateWithLifecycle()
+    val history    by viewModel.calcHistory.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
 
     Column(
@@ -180,7 +180,7 @@ private fun CalculatorMainScreen(viewModel: PaisaTrackerViewModel) {
 // ── History screen (unchanged) ───────────────────────────────────────────────
 @Composable
 private fun CalculatorHistoryScreen(viewModel: PaisaTrackerViewModel) {
-    val history by viewModel.calcHistory.collectAsState()
+    val history by viewModel.calcHistory.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     Column(

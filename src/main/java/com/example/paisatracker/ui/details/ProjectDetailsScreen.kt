@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import com.example.paisatracker.ui.common.HeaderActionButton
 import com.example.paisatracker.ui.common.ScreenHeader
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -73,11 +74,11 @@ fun ProjectDetailsScreen(
     val searchViewModel: SearchViewModel = viewModel(
         factory = SearchViewModelFactory(application.repository, context)
     )
-    val searchQuery    by searchViewModel.searchQuery.collectAsState()
-    val minAmount      by searchViewModel.minAmount.collectAsState()
-    val maxAmount      by searchViewModel.maxAmount.collectAsState()
-    val searchResults  by searchViewModel.searchResults.collectAsState()
-    val isSearchActive by searchViewModel.isSearchActive.collectAsState()
+    val searchQuery    by searchViewModel.searchQuery.collectAsStateWithLifecycle()
+    val minAmount      by searchViewModel.minAmount.collectAsStateWithLifecycle()
+    val maxAmount      by searchViewModel.maxAmount.collectAsStateWithLifecycle()
+    val searchResults  by searchViewModel.searchResults.collectAsStateWithLifecycle()
+    val isSearchActive by searchViewModel.isSearchActive.collectAsStateWithLifecycle()
 
     LaunchedEffect(projectId) {
         searchViewModel.setProjectId(projectId)

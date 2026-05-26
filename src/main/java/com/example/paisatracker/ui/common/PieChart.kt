@@ -60,7 +60,7 @@ fun PieChartWithLegend(
                         setDrawEntryLabels(false)
 
                         // Disable percentage values on pie
-                        setDrawSliceText(false)
+                        setDrawEntryLabels(false)
 
                         // Rotation
                         rotationAngle = 0f

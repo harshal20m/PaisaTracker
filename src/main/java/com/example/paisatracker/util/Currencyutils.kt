@@ -81,6 +81,16 @@ fun formatCurrency(amount: Double): String {
     val formatter = DecimalFormat("#,##0.00")
     return "${currency.symbol} ${formatter.format(amount)}"
 }
+/**
+ * Format currency with a string symbol (for components that pass symbol directly)
+ */
+fun formatCurrency(amount: Double, symbol: String): String {
+    val formatter = DecimalFormat("#,##0.00")
+    formatter.minimumFractionDigits = 0
+    formatter.maximumFractionDigits = 2
+    return "$symbol ${formatter.format(amount)}"
+}
+
 
 /**
  * Singleton to hold current currency

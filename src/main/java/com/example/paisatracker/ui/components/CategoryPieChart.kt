@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.paisatracker.util.formatCurrency
 import com.example.paisatracker.domain.models.CategorySpending
 import com.example.paisatracker.ui.theme.PaisaTrackerTheme
 import java.text.NumberFormat
@@ -412,13 +413,6 @@ private fun getCategoryColor(index: Int): Color {
         Color(0xFF84CC16)  // Lime
     )
     return colors[index % colors.size]
-}
-
-private fun formatCurrency(value: Double, symbol: String): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = 0
-    return "$symbol ${formatter.format(value)}"
 }
 
 // ============================================================================

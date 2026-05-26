@@ -27,6 +27,7 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
+import com.example.paisatracker.util.formatCurrency
 
 /**
  * TrendChart - A Material 3 line chart component for visualizing spending trends
@@ -389,13 +390,6 @@ data class TrendDataPoint(
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-
-private fun formatCurrency(value: Double, symbol: String): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = 0
-    return "$symbol ${formatter.format(value)}"
-}
 
 // ============================================================================
 // PREVIEWS

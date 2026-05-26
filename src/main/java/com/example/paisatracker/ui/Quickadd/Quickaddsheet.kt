@@ -47,11 +47,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,20 +97,20 @@ fun QuickAddSheet(
         factory = QuickAddViewModelFactory(application.repository)
     )
 
-    val amount          by vm.amountText.collectAsState()
-    val description     by vm.description.collectAsState()
-    val selectedProject by vm.selectedProject.collectAsState()
-    val selectedCat     by vm.selectedCategory.collectAsState()
-    val paymentMethod   by vm.paymentMethod.collectAsState()
-    val selectedDate    by vm.selectedDate.collectAsState()
-    val selectedBankAccount by vm.selectedBankAccount.collectAsState()
-    val isFormValid     by vm.isFormValid.collectAsState()
-    val submitResult    by vm.submitResult.collectAsState()
-    val recentProjects  by vm.recentProjects.collectAsState()
-    val filteredCats    by vm.filteredCategories.collectAsState()
-    val recentCats      by vm.recentCategories.collectAsState()
-    val isCreatingCat   by vm.isCreatingCategory.collectAsState()
-    val bankAccounts    by vm.activeBankAccounts.collectAsState()
+    val amount          by vm.amountText.collectAsStateWithLifecycle()
+    val description     by vm.description.collectAsStateWithLifecycle()
+    val selectedProject by vm.selectedProject.collectAsStateWithLifecycle()
+    val selectedCat     by vm.selectedCategory.collectAsStateWithLifecycle()
+    val paymentMethod   by vm.paymentMethod.collectAsStateWithLifecycle()
+    val selectedDate    by vm.selectedDate.collectAsStateWithLifecycle()
+    val selectedBankAccount by vm.selectedBankAccount.collectAsStateWithLifecycle()
+    val isFormValid     by vm.isFormValid.collectAsStateWithLifecycle()
+    val submitResult    by vm.submitResult.collectAsStateWithLifecycle()
+    val recentProjects  by vm.recentProjects.collectAsStateWithLifecycle()
+    val filteredCats    by vm.filteredCategories.collectAsStateWithLifecycle()
+    val recentCats      by vm.recentCategories.collectAsStateWithLifecycle()
+    val isCreatingCat   by vm.isCreatingCategory.collectAsStateWithLifecycle()
+    val bankAccounts    by vm.activeBankAccounts.collectAsStateWithLifecycle()
 
     // Date picker state
     var showDatePicker by remember { mutableStateOf(false) }
@@ -226,8 +226,8 @@ fun QuickAddSheet(
             filteredCategories = filteredCats,
             recentCategories = recentCats.take(5),
             isCreatingNew = isCreatingCat,
-            newCategoryName = vm.newCategoryName.collectAsState().value,
-            newCategoryEmoji = vm.newCategoryEmoji.collectAsState().value,
+            newCategoryName = vm.newCategoryName.collectAsStateWithLifecycle().value,
+            newCategoryEmoji = vm.newCategoryEmoji.collectAsStateWithLifecycle().value,
             viewModel = viewModel,
             onCategorySelected = { vm.onCategorySelected(it) },
             onStartCreate = { vm.startCreatingCategory() },

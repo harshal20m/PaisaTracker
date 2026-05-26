@@ -164,14 +164,14 @@ private fun AccountsTab(
         factory = SalaryViewModelFactory(app.repository, mainViewModel)
     )
     // Multi-salary support
-    val currentMonthSalaries by salaryViewModel.currentMonthSalaries.collectAsState()
-    val totalIncome by salaryViewModel.totalMonthlyIncome.collectAsState()
-    val totalSpent by salaryViewModel.totalSpentThisMonth.collectAsState()
-    val remaining by salaryViewModel.remainingBalance.collectAsState()
-    val spendPercentage by salaryViewModel.spendPercentage.collectAsState()
+    val currentMonthSalaries by salaryViewModel.currentMonthSalaries.collectAsStateWithLifecycle()
+    val totalIncome by salaryViewModel.totalMonthlyIncome.collectAsStateWithLifecycle()
+    val totalSpent by salaryViewModel.totalSpentThisMonth.collectAsStateWithLifecycle()
+    val remaining by salaryViewModel.remainingBalance.collectAsStateWithLifecycle()
+    val spendPercentage by salaryViewModel.spendPercentage.collectAsStateWithLifecycle()
     
     // Legacy support (for backward compatibility)
-    val currentSalary by salaryViewModel.currentSalary.collectAsState()
+    val currentSalary by salaryViewModel.currentSalary.collectAsStateWithLifecycle()
 
     var showAddAccountSheet by remember { mutableStateOf(false) }
     var showAddSalarySheet by remember { mutableStateOf(false) }
@@ -463,7 +463,7 @@ private fun BudgetsTab(
     currencySymbol: String
 ) {
     // Simply embed the existing BudgetScreen content without the Scaffold
-    val allBudgets by viewModel.budgetsWithSpending.collectAsState()
+    val allBudgets by viewModel.budgetsWithSpending.collectAsStateWithLifecycle()
     val activeBudgets = allBudgets.filter { it.budget.isActive }
     val inactiveBudgets = allBudgets.filter { !it.budget.isActive }
     
@@ -2218,7 +2218,7 @@ private fun LegacySalaryManagementCard(
     currencySymbol: String
 ) {
     var showEditSheet by remember { mutableStateOf(false) }
-    val activeAccounts by salaryViewModel.activeBankAccounts.collectAsState()
+    val activeAccounts by salaryViewModel.activeBankAccounts.collectAsStateWithLifecycle()
     
     val spendPercentage = if (currentSalary != null && currentSalary.amount > 0) {
         (totalSpent / currentSalary.amount).toFloat().coerceIn(0f, 1f)

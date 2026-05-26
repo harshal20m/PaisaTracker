@@ -59,11 +59,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -92,7 +92,7 @@ fun BudgetScreen(
     onOpenCategory: (Long) -> Unit = {},
     currencySymbol: String = "₹"
 ) {
-    val allBudgets by viewModel.budgetsWithSpending.collectAsState()
+    val allBudgets by viewModel.budgetsWithSpending.collectAsStateWithLifecycle()
     val activeBudgets = allBudgets.filter { it.budget.isActive }
     val inactiveBudgets = allBudgets.filter { !it.budget.isActive }
     var showAddSheet by remember { mutableStateOf(false) }

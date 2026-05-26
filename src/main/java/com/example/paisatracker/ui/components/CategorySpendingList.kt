@@ -1,24 +1,17 @@
 package com.example.paisatracker.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,31 +19,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.paisatracker.domain.models.CategorySpending
 import com.example.paisatracker.ui.theme.PaisaTrackerTheme
-import java.text.NumberFormat
-import java.util.*
-
-@OptIn(ExperimentalLayoutApi::class)
+import com.example.paisatracker.util.formatCurrency
 
 /**
- * CategorySpendingList - A Material 3 component for displaying category-wise spending breakdown
- * 
- * Features:
- * - List of categories with spending amounts and percentages
- * - Visual progress bars for each category
- * - Color-coded categories
- * - Expandable details (budget comparison, transaction count)
- * - Sort options (by amount, by name, by percentage)
- * - Material 3 styling
- * 
- * @param categories List of category spending data
- * @param onCategoryClick Callback when a category is clicked
- * @param showBudgetComparison Whether to show budget comparison
- * @param currencySymbol Currency symbol to display
- * @param modifier Modifier for the component
+ * CategorySpendingList — Modern dashboard list with:
+ * - Grid view (default): 2-column transparent thin-bordered cards
+ * - List view: full-width rows with inline progress bar
+ * - Sort chips (amount / name / percentage)
+ * - Animated progress bars and percentage pills
  */
 @Composable
 fun CategorySpendingList(
@@ -61,18 +43,18 @@ fun CategorySpendingList(
     modifier: Modifier = Modifier
 ) {
     var sortOption by remember { mutableStateOf(CategorySortOption.BY_AMOUNT) }
-    var isGridView by remember { mutableStateOf(true) } // Default to grid view
-    
+    var isGridView by remember { mutableStateOf(true) } // Grid is default
+
     val sortedCategories = remember(categories, sortOption) {
         when (sortOption) {
             CategorySortOption.BY_AMOUNT -> categories.sortedByDescending { it.total }
-            CategorySortOption.BY_NAME -> categories.sortedBy { it.categoryName }
+            CategorySortOption.BY_NAME   -> categories.sortedBy { it.categoryName }
             CategorySortOption.BY_PERCENTAGE -> categories.sortedByDescending { it.percentage }
         }
     }
-    
+
     Column(modifier = modifier) {
-        // Sort options and view toggle
+        // ── Controls row ─────────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -85,48 +67,28 @@ fun CategorySpendingList(
                 onOptionSelected = { sortOption = it },
                 modifier = Modifier.weight(1f)
             )
-            
-            // View toggle button
-            IconButton(
-                onClick = { isGridView = !isGridView },
-                modifier = Modifier.padding(start = 8.dp)
-            ) {
+            IconButton(onClick = { isGridView = !isGridView }) {
                 Icon(
-                    imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
-                    contentDescription = if (isGridView) "Switch to List View" else "Switch to Grid View",
+                    imageVector = if (isGridView) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
+                    contentDescription = if (isGridView) "Switch to list view" else "Switch to grid view",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
-        
-        // Category list or grid
+
+        // ── Grid or List ──────────────────────────────────────────────────────
         if (isGridView) {
-            // Grid layout using FlowRow
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                maxItemsInEachRow = 3
-            ) {
-                sortedCategories.forEach { category ->
-                    CategoryGridItem(
-                        category = category,
-                        onClick = { onCategoryClick(category) },
-                        currencySymbol = currencySymbol,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
+            CategoryGrid(
+                categories = sortedCategories,
+                onCategoryClick = onCategoryClick,
+                currencySymbol = currencySymbol
+            )
         } else {
-            // List layout
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 sortedCategories.forEach { category ->
-                    CategorySpendingItem(
+                    CategorySpendingRow(
                         category = category,
                         onClick = { onCategoryClick(category) },
-                        showBudgetComparison = showBudgetComparison,
                         currencySymbol = currencySymbol
                     )
                 }
@@ -135,335 +97,260 @@ fun CategorySpendingList(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Grid layout — 2-column, transparent cards with thin border
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CategoryGrid(
+    categories: List<CategorySpending>,
+    onCategoryClick: (CategorySpending) -> Unit,
+    currencySymbol: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        categories.chunked(2).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowItems.forEach { category ->
+                    CategoryGridCard(
+                        category = category,
+                        onClick = { onCategoryClick(category) },
+                        currencySymbol = currencySymbol,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                // Pad the last row if odd number of items
+                if (rowItems.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
 /**
- * Individual category spending item
+ * Transparent thin-bordered grid card
  */
 @Composable
-private fun CategorySpendingItem(
+private fun CategoryGridCard(
     category: CategorySpending,
     onClick: () -> Unit,
-    showBudgetComparison: Boolean,
     currencySymbol: String,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    
+    val animatedProgress by animateFloatAsState(
+        targetValue = (category.percentage / 100f).toFloat(),
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "grid_progress"
+    )
+    val categoryColor = getCategoryColor(category.categoryName)
+
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded },
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+            containerColor = Color.Transparent
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Main content
+            // Icon + percentage pill on the same row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Category info
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(categoryColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Category emoji/icon
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(getCategoryColor(category.categoryName)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = category.categoryIcon,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                    
-                    Column {
-                        Text(
-                            text = category.categoryName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        
-                        Text(
-                            text = "${category.count} transaction${if (category.count != 1) "s" else ""}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(text = category.categoryIcon, fontSize = 18.sp)
                 }
-                
-                // Amount and percentage
-                Column(
-                    horizontalAlignment = Alignment.End
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = categoryColor.copy(alpha = 0.12f)
                 ) {
-                    Text(
-                        text = formatCurrency(category.total, currencySymbol),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
                     Text(
                         text = "${String.format("%.1f", category.percentage)}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = categoryColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                     )
                 }
-                
-                // Expand icon
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
             }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Progress bar
-            CategoryProgressBar(
-                percentage = category.percentage,
-                color = getCategoryColor(category.categoryName)
+
+            // Category name
+            Text(
+                text = category.categoryName,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            
-            // Expanded content
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+
+            // Amount
+            Text(
+                text = formatCurrency(category.total, currencySymbol),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Transaction count
+            Text(
+                text = "${category.count} txn${if (category.count != 1) "s" else ""}",
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Thin progress bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
             ) {
-                Column(
-                    modifier = Modifier.padding(top = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Divider()
-                    
-                    // Budget comparison removed - not available in CategorySpending
-                    // Will be added in Sprint 7 when Budget integration is complete
-                    
-                    // Average per transaction
-                    DetailRow(
-                        label = "Avg per transaction",
-                        value = formatCurrency(category.getAveragePerExpense(), currencySymbol)
-                    )
-                    
-                    // Date range removed - not available in CategorySpending
-                    // Will be added in Sprint 7 when enhanced analytics are implemented
-                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(categoryColor)
+                )
             }
         }
     }
 }
 
-/**
- * Compact grid item for category spending
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// List row — full width with icon, progress bar, amount + pill
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-fun CategoryGridItem(
+private fun CategorySpendingRow(
     category: CategorySpending,
     onClick: () -> Unit,
     currencySymbol: String,
     modifier: Modifier = Modifier
 ) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = (category.percentage / 100f).toFloat(),
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "row_progress"
+    )
+    val categoryColor = getCategoryColor(category.categoryName)
+
     Card(
         modifier = modifier
+            .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = Color.Transparent
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Category icon with background
+            // Icon bubble
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(CircleShape)
-                    .background(getCategoryColor(category.categoryName)),
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(categoryColor.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
+                Text(text = category.categoryIcon, fontSize = 20.sp)
+            }
+
+            // Name + bar + count
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
                 Text(
-                    text = category.categoryIcon,
-                    style = MaterialTheme.typography.titleLarge
+                    text = category.categoryName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedProgress)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(categoryColor)
+                    )
+                }
+                Text(
+                    text = "${category.count} transaction${if (category.count != 1) "s" else ""}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            // Category name
-            Text(
-                text = category.categoryName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-            
-            // Amount
-            Text(
-                text = formatCurrency(category.total, currencySymbol),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
-            // Percentage and transaction count
+
+            // Amount + pill
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Text(
+                    text = formatCurrency(category.total, currencySymbol),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
+                    shape = RoundedCornerShape(6.dp),
+                    color = categoryColor.copy(alpha = 0.12f)
                 ) {
                     Text(
                         text = "${String.format("%.1f", category.percentage)}%",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = categoryColor,
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
-
-                Text(
-                    text = "${category.count} txn",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
-            
-            // Progress bar
-            CategoryProgressBar(
-                percentage = category.percentage,
-                color = getCategoryColor(category.categoryName),
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort chips
+// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Progress bar showing category percentage
- */
-@Composable
-private fun CategoryProgressBar(
-    percentage: Double,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    val animatedProgress by animateFloatAsState(
-        targetValue = (percentage / 100f).toFloat(),
-        animationSpec = tween(durationMillis = 1000),
-        label = "progress_animation"
-    )
-    
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(animatedProgress)
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(4.dp))
-                .background(color)
-        )
-    }
-}
-
-/**
- * Budget comparison row
- */
-@Composable
-private fun BudgetComparisonRow(
-    spent: Double,
-    budget: Double,
-    currencySymbol: String
-) {
-    val remaining = budget - spent
-    val isOverBudget = remaining < 0
-    
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "Budget",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = formatCurrency(budget, currencySymbol),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            
-            Text(
-                text = "${if (isOverBudget) "Over" else "Remaining"}: ${formatCurrency(Math.abs(remaining), currencySymbol)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isOverBudget) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    Color(0xFF4CAF50)
-                }
-            )
-        }
-    }
-}
-
-/**
- * Generic detail row
- */
-@Composable
-private fun DetailRow(
-    label: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-/**
- * Sort chips for category list
- */
 @Composable
 private fun CategorySortChips(
     selectedOption: CategorySortOption,
@@ -484,7 +371,8 @@ private fun CategorySortChips(
                             CategorySortOption.BY_AMOUNT -> "Amount"
                             CategorySortOption.BY_NAME -> "Name"
                             CategorySortOption.BY_PERCENTAGE -> "Percentage"
-                        }
+                        },
+                        fontSize = 11.sp
                     )
                 }
             )
@@ -493,7 +381,7 @@ private fun CategorySortChips(
 }
 
 // ============================================================================
-// DATA CLASSES & ENUMS
+// ENUMS
 // ============================================================================
 
 enum class CategorySortOption {
@@ -503,30 +391,22 @@ enum class CategorySortOption {
 }
 
 // ============================================================================
-// UTILITY FUNCTIONS
+// UTILITY
 // ============================================================================
 
-private fun formatCurrency(value: Double, symbol: String): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = 2
-    return "$symbol ${formatter.format(value)}"
-}
-
-private fun formatDateRange(start: Long, end: Long): String {
-    val dateFormat = java.text.SimpleDateFormat("MMM dd", Locale.getDefault())
-    return "${dateFormat.format(Date(start))} - ${dateFormat.format(Date(end))}"
-}
-
-private fun getCategoryColor(categoryName: String): Color {
-    // Generate consistent color based on category name
+internal fun getCategoryColor(categoryName: String): Color {
     val colors = listOf(
-        Color(0xFFE57373), Color(0xFFBA68C8), Color(0xFF64B5F6),
-        Color(0xFF4DB6AC), Color(0xFFAED581), Color(0xFFFFD54F),
-        Color(0xFFFF8A65), Color(0xFF90A4AE)
+        Color(0xFFE57373),
+        Color(0xFFBA68C8),
+        Color(0xFF64B5F6),
+        Color(0xFF4DB6AC),
+        Color(0xFFAED581),
+        Color(0xFFFFD54F),
+        Color(0xFFFF8A65),
+        Color(0xFF90A4AE)
     )
-    val index = categoryName.hashCode().mod(colors.size)
-    return colors[index].copy(alpha = 0.3f)
+    val index = Math.floorMod(categoryName.hashCode(), colors.size)
+    return colors[index]
 }
 
 // ============================================================================
@@ -535,35 +415,15 @@ private fun getCategoryColor(categoryName: String): Color {
 
 @Preview(showBackground = true)
 @Composable
-private fun CategorySpendingListPreview() {
+private fun CategorySpendingListGridPreview() {
     PaisaTrackerTheme {
         Surface {
             CategorySpendingList(
                 categories = listOf(
-                    CategorySpending(
-                        categoryId = 1,
-                        categoryName = "Food & Dining",
-                        categoryIcon = "🍔",
-                        total = 15000.0,
-                        count = 45,
-                        percentage = 35.0
-                    ),
-                    CategorySpending(
-                        categoryId = 2,
-                        categoryName = "Transportation",
-                        categoryIcon = "🚗",
-                        total = 8000.0,
-                        count = 20,
-                        percentage = 18.6
-                    ),
-                    CategorySpending(
-                        categoryId = 3,
-                        categoryName = "Shopping",
-                        categoryIcon = "🛍️",
-                        total = 12000.0,
-                        count = 15,
-                        percentage = 27.9
-                    )
+                    CategorySpending(categoryId = 1, categoryName = "Food & Dining", categoryIcon = "🍔", total = 15000.0, count = 45, percentage = 35.0),
+                    CategorySpending(categoryId = 2, categoryName = "Transportation", categoryIcon = "🚗", total = 8000.0, count = 20, percentage = 18.6),
+                    CategorySpending(categoryId = 3, categoryName = "Shopping", categoryIcon = "🛍️", total = 12000.0, count = 15, percentage = 27.9),
+                    CategorySpending(categoryId = 4, categoryName = "Entertainment", categoryIcon = "🎬", total = 5000.0, count = 10, percentage = 11.6)
                 ),
                 modifier = Modifier.padding(16.dp)
             )
@@ -578,19 +438,10 @@ private fun CategorySpendingListDarkPreview() {
         Surface {
             CategorySpendingList(
                 categories = listOf(
-                    CategorySpending(
-                        categoryId = 1,
-                        categoryName = "Entertainment",
-                        categoryIcon = "🎬",
-                        total = 5000.0,
-                        count = 10,
-                        percentage = 45.0
-                    )
+                    CategorySpending(categoryId = 1, categoryName = "Entertainment", categoryIcon = "🎬", total = 5000.0, count = 10, percentage = 45.0)
                 ),
                 modifier = Modifier.padding(16.dp)
             )
         }
     }
 }
-
-// Made with Bob

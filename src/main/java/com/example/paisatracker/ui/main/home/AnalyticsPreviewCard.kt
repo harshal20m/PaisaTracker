@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -107,7 +109,7 @@ fun AnalyticsPreviewCard(
                 
                 IconButton(onClick = onViewFullAnalytics) {
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "View Full Analytics",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -290,7 +292,7 @@ fun AnalyticsPreviewCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Icon(
-                    imageVector = Icons.Default.ArrowForward,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -396,7 +398,7 @@ private fun MiniCategoryRow(category: CategorySpending) {
 // ============================================================================
 
 private fun formatCurrency(value: Double): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
+    val formatter = NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN"))
     formatter.minimumFractionDigits = 0
     formatter.maximumFractionDigits = 0
     

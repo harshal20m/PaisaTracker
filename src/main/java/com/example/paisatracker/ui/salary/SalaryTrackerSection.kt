@@ -27,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -53,11 +53,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,15 +101,15 @@ fun SalaryTrackerSection(
     val context = LocalContext.current
     val app = context.applicationContext as PaisaTrackerApplication
     val vm: SalaryViewModel = viewModel(factory = SalaryViewModelFactory(app.repository, viewModel))
-    val currentSalary by vm.currentSalary.collectAsState()
-    val totalSpent by vm.totalSpentThisMonth.collectAsState()
-    val remaining by vm.remainingBalance.collectAsState()
-    val spendPct by vm.spendPercentage.collectAsState()
-    val history by vm.allSalaryRecords.collectAsState()
-    val activeAccounts by vm.activeBankAccounts.collectAsState()
-    val allExpenses by viewModel.getAllExpensesWithDetails().collectAsState(initial = emptyList())
-    val allProjects by viewModel.getAllProjects().collectAsState(initial = emptyList())
-    val allCategories by viewModel.getAllCategories().collectAsState(initial = emptyList())
+    val currentSalary by vm.currentSalary.collectAsStateWithLifecycle()
+    val totalSpent by vm.totalSpentThisMonth.collectAsStateWithLifecycle()
+    val remaining by vm.remainingBalance.collectAsStateWithLifecycle()
+    val spendPct by vm.spendPercentage.collectAsStateWithLifecycle()
+    val history by vm.allSalaryRecords.collectAsStateWithLifecycle()
+    val activeAccounts by vm.activeBankAccounts.collectAsStateWithLifecycle()
+    val allExpenses by viewModel.getAllExpensesWithDetails().collectAsStateWithLifecycle(initialValue = emptyList())
+    val allProjects by viewModel.getAllProjects().collectAsStateWithLifecycle(initialValue = emptyList())
+    val allCategories by viewModel.getAllCategories().collectAsStateWithLifecycle(initialValue = emptyList())
     var expanded by remember { mutableStateOf(true) }
     var showAddSheet by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
@@ -403,7 +403,7 @@ fun SalaryTrackerSection(
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                     )
                                     Icon(
-                                        Icons.Default.KeyboardArrowRight,
+                                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp),
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
@@ -639,9 +639,9 @@ private fun AddSalarySheet(
     var amountText by remember { mutableStateOf(existing?.amount?.let { "%.0f".format(it) } ?: "") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
     var resetTracking by remember { mutableStateOf(false) }
-    var creditToAccount by remember { mutableStateOf(existing?.recurringAccountId != null) }
+    var creditToAccount by remember { mutableStateOf(existing?.linkedAccountId != null) }
     var isRecurring by remember { mutableStateOf(existing?.isRecurring == true) }
-    var selectedAccountId by remember { mutableStateOf(existing?.recurringAccountId) }
+    var selectedAccountId by remember { mutableStateOf(existing?.linkedAccountId) }
     Column(
         modifier = Modifier
             .fillMaxWidth()

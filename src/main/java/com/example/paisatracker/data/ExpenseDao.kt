@@ -55,7 +55,20 @@ interface ExpenseDao {
     @Query("SELECT * FROM expenses WHERE categoryId = :categoryId ORDER BY date DESC")
     fun getExpensesForCategory(categoryId: Long): Flow<List<Expense>>
 
-    @Query("SELECT * FROM expenses WHERE categoryId = :categoryId")
+    @Query("""
+        SELECT * FROM expenses
+        WHERE categoryId = :categoryId
+        AND date >= :startOfYear
+        AND date < :endOfYear
+        ORDER BY date DESC
+    """)
+    suspend fun getExpensesForCategoryByYear(
+        categoryId: Long,
+        startOfYear: Long,
+        endOfYear: Long
+    ): List<Expense>
+
+    @Query("SELECT * FROM expenses WHERE categoryId = :categoryId ORDER BY date DESC")
     suspend fun getExpensesForCategoryList(categoryId: Long): List<Expense>
 
     @Query("""
@@ -245,13 +258,16 @@ interface ExpenseDao {
      * @return Flow of monthly totals
      */
     @Query("""
-        SELECT 
+        SELECT
             strftime('%Y-%m', date/1000, 'unixepoch') as month,
-            SUM(amount) as total,
+            SUM(e.amount) as total,
             COUNT(*) as count
-        FROM expenses 
-        GROUP BY month 
-        ORDER BY month DESC 
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE p.isCompleted = 0
+        GROUP BY month
+        ORDER BY month DESC
         LIMIT :months
     """)
     fun getMonthlyTotals(months: Int = 12): Flow<List<com.example.paisatracker.domain.models.MonthlyTotal>>
@@ -263,12 +279,15 @@ interface ExpenseDao {
      * @return Flow of yearly totals
      */
     @Query("""
-        SELECT 
+        SELECT
             strftime('%Y', date/1000, 'unixepoch') as year,
-            SUM(amount) as total,
+            SUM(e.amount) as total,
             COUNT(*) as count
-        FROM expenses 
-        GROUP BY year 
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE p.isCompleted = 0
+        GROUP BY year
         ORDER BY year DESC
     """)
     fun getYearlyTotals(): Flow<List<com.example.paisatracker.domain.models.YearlyTotal>>
@@ -282,7 +301,7 @@ interface ExpenseDao {
      * @return Flow of category spending data
      */
     @Query("""
-        SELECT 
+        SELECT
             c.id as categoryId,
             c.name as categoryName,
             c.emoji as categoryIcon,
@@ -291,7 +310,9 @@ interface ExpenseDao {
             0.0 as percentage
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
         WHERE e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
         GROUP BY c.id, c.name, c.emoji
         ORDER BY total DESC
     """)
@@ -308,7 +329,14 @@ interface ExpenseDao {
      * @param endDate End timestamp (inclusive)
      * @return Total amount spent, or 0.0 if no expenses
      */
-    @Query("SELECT COALESCE(SUM(amount), 0.0) FROM expenses WHERE date BETWEEN :startDate AND :endDate")
+    @Query("""
+        SELECT COALESCE(SUM(e.amount), 0.0)
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
+    """)
     suspend fun getTotalByDateRange(startDate: Long, endDate: Long): Double
 
     /**
@@ -319,7 +347,14 @@ interface ExpenseDao {
      * @param endDate End timestamp (inclusive)
      * @return Number of expenses in the date range
      */
-    @Query("SELECT COUNT(*) FROM expenses WHERE date BETWEEN :startDate AND :endDate")
+    @Query("""
+        SELECT COUNT(*)
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
+    """)
     suspend fun getCountByDateRange(startDate: Long, endDate: Long): Int
 
     /**
@@ -330,13 +365,16 @@ interface ExpenseDao {
      * @return Flow of monthly totals for the year
      */
     @Query("""
-        SELECT 
+        SELECT
             strftime('%Y-%m', date/1000, 'unixepoch') as month,
-            SUM(amount) as total,
+            SUM(e.amount) as total,
             COUNT(*) as count
-        FROM expenses 
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
         WHERE strftime('%Y', date/1000, 'unixepoch') = :year
-        GROUP BY month 
+        AND p.isCompleted = 0
+        GROUP BY month
         ORDER BY month ASC
     """)
     fun getMonthlyTotalsForYear(year: String): Flow<List<com.example.paisatracker.domain.models.MonthlyTotal>>
@@ -351,7 +389,7 @@ interface ExpenseDao {
      * @return Flow of top category spending data
      */
     @Query("""
-        SELECT 
+        SELECT
             c.id as categoryId,
             c.name as categoryName,
             c.emoji as categoryIcon,
@@ -360,7 +398,9 @@ interface ExpenseDao {
             0.0 as percentage
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
         WHERE e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
         GROUP BY c.id, c.name, c.emoji
         ORDER BY total DESC
         LIMIT :limit
@@ -380,11 +420,14 @@ interface ExpenseDao {
      * @return Average spending per day
      */
     @Query("""
-        SELECT 
-            COALESCE(SUM(amount) / 
+        SELECT
+            COALESCE(SUM(e.amount) /
                 (CAST(((:endDate - :startDate) / 86400000) AS REAL) + 1), 0.0)
-        FROM expenses 
-        WHERE date BETWEEN :startDate AND :endDate
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
     """)
     suspend fun getAverageDailySpending(startDate: Long, endDate: Long): Double
 
@@ -403,10 +446,13 @@ interface ExpenseDao {
      * @return Total amount spent in the category
      */
     @Query("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM expenses
-        WHERE categoryId = :categoryId
-        AND date BETWEEN :startDate AND :endDate
+        SELECT COALESCE(SUM(e.amount), 0.0)
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE e.categoryId = :categoryId
+        AND e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
     """)
     suspend fun getTotalByCategoryAndDateRange(
         categoryId: Long,
@@ -427,8 +473,10 @@ interface ExpenseDao {
         SELECT COALESCE(SUM(e.amount), 0.0)
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
         WHERE c.projectId = :projectId
         AND e.date BETWEEN :startDate AND :endDate
+        AND p.isCompleted = 0
     """)
     suspend fun getTotalByProjectAndDateRange(
         projectId: Long,

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -57,8 +58,8 @@ fun SettingsScreen(
         factory = SettingsViewModelFactory(application.themePreferencesRepository, currencyPreferencesRepository)
     )
 
-    val currentTheme     by settingsViewModel.currentTheme.collectAsState()
-    val selectedCurrency by settingsViewModel.selectedCurrency.collectAsState()
+    val currentTheme     by settingsViewModel.currentTheme.collectAsStateWithLifecycle()
+    val selectedCurrency by settingsViewModel.selectedCurrency.collectAsStateWithLifecycle()
 
     var showNotificationDialog    by remember { mutableStateOf(false) }
     var showBatteryDialog         by remember { mutableStateOf(false) }
@@ -76,7 +77,7 @@ fun SettingsScreen(
     var showPinSetupDialog  by remember { mutableStateOf(false) }
     var showAppLockDialog   by remember { mutableStateOf(false) }
 
-    val updateAvailable by viewModel.updateAvailable.collectAsState()
+    val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
 
 
 

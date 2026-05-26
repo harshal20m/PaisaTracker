@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -47,12 +48,12 @@ fun SearchBottomSheet(
     onExpenseClick: (RecentExpense) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val searchQuery by searchViewModel.searchQuery.collectAsState()
-    val minAmount by searchViewModel.minAmount.collectAsState()
-    val maxAmount by searchViewModel.maxAmount.collectAsState()
-    val searchResults by searchViewModel.searchResults.collectAsState()
-    val isSearchActive by searchViewModel.isSearchActive.collectAsState()
-    val recentSearches by searchViewModel.recentSearches.collectAsState()
+    val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
+    val minAmount by searchViewModel.minAmount.collectAsStateWithLifecycle()
+    val maxAmount by searchViewModel.maxAmount.collectAsStateWithLifecycle()
+    val searchResults by searchViewModel.searchResults.collectAsStateWithLifecycle()
+    val isSearchActive by searchViewModel.isSearchActive.collectAsStateWithLifecycle()
+    val recentSearches by searchViewModel.recentSearches.collectAsStateWithLifecycle()
     
     var showAdvancedFilters by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current

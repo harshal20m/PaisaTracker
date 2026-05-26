@@ -1,6 +1,7 @@
 package com.example.paisatracker.ui.details
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,14 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.PieChart
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.PieChart
 import androidx.compose.material3.*
-import com.example.paisatracker.ui.common.ScreenHeader
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +33,8 @@ import com.example.paisatracker.PaisaTrackerViewModel
 import com.example.paisatracker.data.CategoryExpense
 import com.example.paisatracker.ui.common.BarChart
 import com.example.paisatracker.ui.common.PieChartWithLegend
+import com.example.paisatracker.ui.common.ScreenHeader
+import com.example.paisatracker.ui.components.getCategoryColor
 import com.example.paisatracker.util.formatCurrency
 import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieEntry
@@ -62,34 +62,36 @@ fun ProjectInsightsScreen(
                 subtitle = "Spending analytics",
                 onBackClick = { navController.popBackStack() }
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (categoryExpenses.isEmpty()) {
                 item { EmptyState() }
             } else {
-                item { AnimatedTotalCard(totalSpent) }
+                // ── Hero total card ──────────────────────────────────────────
+                item { HeroTotalCard(totalSpent) }
 
+                // ── Mini stat row ────────────────────────────────────────────
                 item {
+                    val avg = if (categoryExpenses.isNotEmpty()) totalSpent / categoryExpenses.size else 0.0
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val avg = if (categoryExpenses.isNotEmpty()) totalSpent / categoryExpenses.size else 0.0
-                        AnimatedStatCard(
-                            icon = Icons.Outlined.TrendingUp,
+                        MiniStatCard(
+                            icon = Icons.AutoMirrored.Outlined.TrendingUp,
                             value = formatCurrency(avg),
-                            label = "Average",
+                            label = "Avg per category",
                             modifier = Modifier.weight(1f)
                         )
-                        AnimatedStatCard(
+                        MiniStatCard(
                             icon = Icons.Outlined.Category,
                             value = "${categoryExpenses.size}",
                             label = "Categories",
@@ -98,52 +100,35 @@ fun ProjectInsightsScreen(
                     }
                 }
 
+                // ── Top category strip ───────────────────────────────────────
                 item {
                     val top = categoryExpenses.maxByOrNull { it.totalAmount }
-                    top?.let {
-                        TopCategoryCard(it.categoryName, it.totalAmount, totalSpent)
-                    }
+                    top?.let { TopCategoryStrip(it.categoryName, it.totalAmount, totalSpent) }
                 }
 
-                item {
-                    ModernChartToggle(currentChartType) { currentChartType = it }
-                }
+                // ── Chart with tabs ──────────────────────────────────────────
+                item { ChartSection(currentChartType, categoryExpenses, onTypeChange = { currentChartType = it }) }
 
-                item {
-                    ChartCard(currentChartType, categoryExpenses)
-                }
-
+                // ── Section header ───────────────────────────────────────────
                 item {
                     Text(
-                        "Breakdown",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "Breakdown",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                     )
                 }
 
-                // Masonry 2-column grid
+                // ── Category rows ─────────────────────────────────────────────
                 val sorted = categoryExpenses.sortedByDescending { it.totalAmount }
-                sorted.chunked(2).forEach { rowItems ->
+                sorted.forEach { cat ->
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            rowItems.forEach { cat ->
-                                val percent = if (totalSpent > 0) ((cat.totalAmount / totalSpent) * 100) else 0.0
-                                MasonryCategoryCard(
-                                    name = cat.categoryName,
-                                    amount = cat.totalAmount,
-                                    percent = percent,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            if (rowItems.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
+                        val percent = if (totalSpent > 0) (cat.totalAmount / totalSpent) * 100 else 0.0
+                        CategoryExpenseRow(
+                            name = cat.categoryName,
+                            amount = cat.totalAmount,
+                            percent = percent
+                        )
                     }
                 }
             }
@@ -151,317 +136,423 @@ fun ProjectInsightsScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero total card with spring scale-in animation
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun AnimatedTotalCard(totalSpent: Double) {
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(100)
-        isVisible = true
-    }
+private fun HeroTotalCard(totalSpent: Double) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { delay(80); visible = true }
+
     val scale by animateFloatAsState(
-        targetValue = if (isVisible) 1f else 0.8f,
+        targetValue = if (visible) 1f else 0.88f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow
-        ), label = "scale"
+        ),
+        label = "hero_scale"
     )
+
     Card(
-        modifier = Modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale },
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale },
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                "Total Spending",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                fontSize = 12.sp
+                text = "TOTAL SPENDING",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f),
+                letterSpacing = 1.sp
             )
-            Spacer(Modifier.height(6.dp))
-            CountingNumberAnimation(totalSpent)
+            CountingNumber(totalSpent)
         }
     }
 }
 
 @Composable
-private fun CountingNumberAnimation(targetValue: Double) {
-    var currentValue by remember { mutableStateOf(0.0) }
-    LaunchedEffect(targetValue) {
-        val duration = 1000L
-        val steps = 50
-        val increment = targetValue / steps
+private fun CountingNumber(target: Double) {
+    var current by remember { mutableStateOf(0.0) }
+    LaunchedEffect(target) {
+        val steps = 48
+        val increment = target / steps
         repeat(steps) {
-            currentValue += increment
-            delay(duration / steps)
+            current += increment
+            delay(1000L / steps)
         }
-        currentValue = targetValue
+        current = target
     }
     Text(
-        formatCurrency(currentValue),
+        text = formatCurrency(current),
+        style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-        fontSize = 32.sp
+        color = MaterialTheme.colorScheme.onPrimaryContainer
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Mini stat card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun AnimatedStatCard(
+private fun MiniStatCard(
     icon: ImageVector,
     value: String,
     label: String,
     modifier: Modifier = Modifier
 ) {
-    var clicked by remember { mutableStateOf(false) }
+    var tapped by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(
-        targetValue = if (clicked) 360f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        finishedListener = { clicked = false },
-        label = "rotation"
+        targetValue = if (tapped) 360f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        finishedListener = { tapped = false },
+        label = "icon_rotation"
     )
+
     Card(
         modifier = modifier.clickable(
             indication = null,
             interactionSource = remember { MutableInteractionSource() }
-        ) { clicked = true },
+        ) { tapped = true },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp).rotate(rotation),
+                modifier = Modifier
+                    .size(20.dp)
+                    .rotate(rotation),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer
             )
-            Spacer(Modifier.height(8.dp))
             Text(
-                value,
+                text = value,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSecondaryContainer
             )
-            Spacer(Modifier.height(2.dp))
             Text(
-                label,
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                text = label,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.65f)
             )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Top category strip
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun TopCategoryCard(name: String, amount: Double, total: Double) {
-    val percent = if (total > 0) ((amount / total) * 100).toInt() else 0
+private fun TopCategoryStrip(name: String, amount: Double, total: Double) {
+    val pct = if (total > 0) ((amount / total) * 100).toInt() else 0
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("👑", fontSize = 22.sp)
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("👑", fontSize = 16.sp)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "Top Category",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
                 Text(
-                    name,
+                    text = "TOP CATEGORY",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = name,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(2.dp))
                 Text(
-                    formatCurrency(amount),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
-                    fontSize = 13.sp
+                    text = formatCurrency(amount),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Surface(
-                modifier = Modifier.size(46.dp),
+                modifier = Modifier.size(44.dp),
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.tertiary
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text("$percent%", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onTertiary)
+                    Text(
+                        text = "$pct%",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             }
         }
     }
 }
 
-@Composable
-private fun ModernChartToggle(current: ChartType, onChange: (ChartType) -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-    ) {
-        Row(modifier = Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            ChartType.values().forEach { type ->
-                val selected = current == type
-                Surface(
-                    modifier = Modifier.weight(1f).clickable { onChange(type) },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = when (type) { ChartType.PIE -> Icons.Outlined.PieChart; ChartType.BAR -> Icons.Outlined.BarChart },
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            when (type) { ChartType.PIE -> "Pie"; ChartType.BAR -> "Bar" },
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Chart section — toggle tabs built into the card header
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ChartCard(type: ChartType, expenses: List<CategoryExpense>) {
+private fun ChartSection(
+    current: ChartType,
+    expenses: List<CategoryExpense>,
+    onTypeChange: (ChartType) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            when (type) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Tabs inside the card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ChartType.values().forEach { type ->
+                        val selected = current == type
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onTypeChange(type) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(vertical = 9.dp, horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = when (type) {
+                                        ChartType.PIE -> Icons.Outlined.PieChart
+                                        ChartType.BAR -> Icons.Outlined.BarChart
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = if (selected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = when (type) {
+                                        ChartType.PIE -> "Pie"
+                                        ChartType.BAR -> "Bar"
+                                    },
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Chart content
+            when (current) {
                 ChartType.PIE -> {
                     val entries = expenses.map { PieEntry(it.totalAmount.toFloat(), it.categoryName) }
-                    PieChartWithLegend(modifier = Modifier.fillMaxWidth().height(260.dp), entries = entries, description = "")
+                    PieChartWithLegend(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp),
+                        entries = entries,
+                        description = ""
+                    )
                 }
                 ChartType.BAR -> {
                     val entries = expenses.mapIndexed { i, e -> BarEntry(i.toFloat(), e.totalAmount.toFloat()) }
                     val labels = expenses.map { it.categoryName }
-                    BarChart(modifier = Modifier.fillMaxWidth().height(260.dp), entries = entries, labels = labels, description = "")
+                    BarChart(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp),
+                        entries = entries,
+                        labels = labels,
+                        description = ""
+                    )
                 }
             }
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Category expense row — replaces the old masonry grid cards
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun MasonryCategoryCard(name: String, amount: Double, percent: Double, modifier: Modifier = Modifier) {
-    var isExpanded by remember { mutableStateOf(false) }
-    val animatedPercent by animateFloatAsState(
-        targetValue = if (isExpanded) percent.toFloat() else 0f,
-        animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
-        label = "percent"
+private fun CategoryExpenseRow(
+    name: String,
+    amount: Double,
+    percent: Double,
+    modifier: Modifier = Modifier
+) {
+    var ready by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { delay(80); ready = true }
+
+    val animatedPct by animateFloatAsState(
+        targetValue = if (ready) percent.toFloat() else 0f,
+        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+        label = "row_pct"
     )
     val scale by animateFloatAsState(
-        targetValue = if (isExpanded) 1f else 0.85f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "scale"
+        targetValue = if (ready) 1f else 0.92f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "row_scale"
     )
-    LaunchedEffect(Unit) {
-        delay(100)
-        isExpanded = true
-    }
+
+    val categoryColor = getCategoryColor(name)
+
     Card(
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Left: name + progress bar
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = name,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp
+                )
+                Text(
+                    text = formatCurrency(amount),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 15.sp
+                )
+                LinearProgressIndicator(
+                    progress = { animatedPct / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = categoryColor,
+                    trackColor = categoryColor.copy(alpha = 0.15f)
+                )
+            }
+
+            // Right: percentage bubble
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = categoryColor.copy(alpha = 0.15f)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        name,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 15.sp
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        formatCurrency(amount),
+                        text = "${animatedPct.toInt()}%",
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 15.sp
+                        fontSize = 11.sp,
+                        color = categoryColor
                     )
-                }
-                Spacer(Modifier.width(6.dp))
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "${animatedPercent.toInt()}%",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
             }
-            LinearProgressIndicator(
-                progress = { animatedPercent / 100f },
-                modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-            )
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty state
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyState() {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 60.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 60.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(40.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(modifier = Modifier.size(72.dp), shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Box(contentAlignment = Alignment.Center) { Text("📊", fontSize = 36.sp) }
+            Surface(
+                modifier = Modifier.size(72.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("📊", fontSize = 36.sp)
+                }
             }
             Spacer(Modifier.height(4.dp))
-            Text("No Data Yet", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text("Add expenses to see insights", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+            Text(
+                text = "No data yet",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp
+            )
+            Text(
+                text = "Add expenses to see insights",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

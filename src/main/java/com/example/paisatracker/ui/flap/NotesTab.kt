@@ -12,15 +12,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.StickyNote2
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.StickyNote2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -39,7 +40,7 @@ import java.util.*
 
 @Composable
 fun NotesTab(viewModel: PaisaTrackerViewModel) {
-    val notes by viewModel.flapNotes.collectAsState()
+    val notes by viewModel.flapNotes.collectAsStateWithLifecycle()
 
     // Compose state for the "add new note" inline input
     var isAddingNote by remember { mutableStateOf(false) }
@@ -137,7 +138,7 @@ fun NotesTab(viewModel: PaisaTrackerViewModel) {
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        Icons.Outlined.StickyNote2,
+                        Icons.AutoMirrored.Outlined.StickyNote2,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)

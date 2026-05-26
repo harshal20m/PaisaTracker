@@ -55,11 +55,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,10 +95,10 @@ fun SearchScreen(
         factory = SearchViewModelFactory(application.repository, context)
     )
 
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchResults by viewModel.searchResults.collectAsState()
-    val minAmount by viewModel.minAmount.collectAsState()
-    val maxAmount by viewModel.maxAmount.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val minAmount by viewModel.minAmount.collectAsStateWithLifecycle()
+    val maxAmount by viewModel.maxAmount.collectAsStateWithLifecycle()
     var advancedFiltersVisible by remember { mutableStateOf(false) }
 
     Scaffold(

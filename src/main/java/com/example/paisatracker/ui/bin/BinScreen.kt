@@ -6,12 +6,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
 import com.example.paisatracker.ui.common.ScreenHeader
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +36,7 @@ import java.util.concurrent.TimeUnit
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BinSheetContent(viewModel: PaisaTrackerViewModel, onDismiss: () -> Unit) {
-    val history by viewModel.actionHistory.collectAsState()
+    val history by viewModel.actionHistory.collectAsStateWithLifecycle()
     val deletedItems = history.filter { it.actionType == "DELETE" }
     var showClearConfirm by remember { mutableStateOf(false) }
 
@@ -169,65 +171,139 @@ fun BinItemRow(
             val gson = Gson()
             when (item.entityType) {
                 "PROJECT" -> {
-                    val data = gson.fromJson(item.entityData, JsonObject::class.java)
-                    val project = gson.fromJson(data.getAsJsonObject("project"), Project::class.java)
-                    val children = data.getAsJsonArray("children")
-                    val childCount = children?.size() ?: 0
-                    val totalExpenses = children?.sumOf { 
-                        it.asJsonObject.getAsJsonArray("expenses")?.size() ?: 0 
-                    } ?: 0
-                    
-                    Quadruple(
-                        project.name, 
-                        "Project • $childCount categories, $totalExpenses expenses", 
-                        Icons.Default.Folder,
-                        project.emoji
-                    )
+                    try {
+                        val data = gson.fromJson(item.entityData, JsonObject::class.java)
+                        if (data == null || !data.has("project")) {
+                            return@remember Quadruple("Project", "Deleted project", Icons.Default.Folder, "📁")
+                        }
+                        
+                        val projectObj = data.getAsJsonObject("project")
+                        if (projectObj == null) {
+                            return@remember Quadruple("Project", "Deleted project", Icons.Default.Folder, "📁")
+                        }
+                        
+                        val project = gson.fromJson(projectObj, Project::class.java)
+                        val children = data.getAsJsonArray("children")
+                        val childCount = children?.size() ?: 0
+                        
+                        val totalExpenses = try {
+                            children?.sumOf { childElement ->
+                                try {
+                                    val childObj = childElement?.asJsonObject
+                                    val expenses = childObj?.getAsJsonArray("expenses")
+                                    expenses?.size() ?: 0
+                                } catch (e: Exception) {
+                                    0
+                                }
+                            } ?: 0
+                        } catch (e: Exception) {
+                            0
+                        }
+                        
+                        Quadruple(
+                            project.name.takeIf { it.isNotBlank() } ?: "Unnamed Project",
+                            "Project • $childCount categories, $totalExpenses expenses",
+                            Icons.Default.Folder,
+                            project.emoji.takeIf { it.isNotBlank() } ?: "📁"
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Quadruple("Project", "Deleted project", Icons.Default.Folder, "📁")
+                    }
                 }
                 "CATEGORY" -> {
-                    val data = gson.fromJson(item.entityData, JsonObject::class.java)
-                    val category = gson.fromJson(data.getAsJsonObject("category"), Category::class.java)
-                    val expenses = data.getAsJsonArray("expenses")
-                    val expCount = expenses?.size() ?: 0
-                    
-                    Quadruple(
-                        category.name, 
-                        "Category • $expCount expenses", 
-                        Icons.Default.Category,
-                        category.emoji
-                    )
+                    try {
+                        val data = gson.fromJson(item.entityData, JsonObject::class.java)
+                        if (data == null || !data.has("category")) {
+                            return@remember Quadruple("Category", "Deleted category", Icons.Default.Category, "📂")
+                        }
+                        
+                        val categoryObj = data.getAsJsonObject("category")
+                        if (categoryObj == null) {
+                            return@remember Quadruple("Category", "Deleted category", Icons.Default.Category, "📂")
+                        }
+                        
+                        val category = gson.fromJson(categoryObj, Category::class.java)
+                        val expenses = data.getAsJsonArray("expenses")
+                        val expCount = expenses?.size() ?: 0
+                        
+                        Quadruple(
+                            category.name.takeIf { it.isNotBlank() } ?: "Unnamed Category",
+                            "Category • $expCount expenses",
+                            Icons.Default.Category,
+                            category.emoji.takeIf { it.isNotBlank() } ?: "📂"
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Quadruple("Category", "Deleted category", Icons.Default.Category, "📂")
+                    }
                 }
                 "EXPENSE" -> {
-                    val expense = gson.fromJson(item.entityData, Expense::class.java)
-                    Quadruple(
-                        expense.description.ifBlank { "Unlabeled Expense" }, 
-                        "Expense • ${expense.amount}", 
-                        Icons.Default.ReceiptLong,
-                        null
-                    )
+                    try {
+                        val expense = gson.fromJson(item.entityData, Expense::class.java)
+                        if (expense == null) {
+                            return@remember Quadruple("Expense", "Deleted expense", Icons.AutoMirrored.Filled.ReceiptLong, null)
+                        }
+                        
+                        Quadruple(
+                            expense.description.takeIf { it.isNotBlank() } ?: "Unlabeled Expense",
+                            "Expense • ${String.format("%.2f", expense.amount)}",
+                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            null
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Quadruple("Expense", "Deleted expense", Icons.AutoMirrored.Filled.ReceiptLong, null)
+                    }
                 }
                 "BUDGET" -> {
-                    val budget = gson.fromJson(item.entityData, Budget::class.java)
-                    Quadruple(
-                        budget.name,
-                        "Budget • ${budget.limitAmount} (${budget.period.displayName})",
-                        Icons.Default.AccountBalanceWallet,
-                        budget.emoji
-                    )
+                    try {
+                        val budget = gson.fromJson(item.entityData, Budget::class.java)
+                        if (budget == null) {
+                            return@remember Quadruple("Budget", "Deleted budget", Icons.Default.AccountBalanceWallet, "💰")
+                        }
+                        
+                        Quadruple(
+                            budget.name.takeIf { it.isNotBlank() } ?: "Unnamed Budget",
+                            "Budget • ${String.format("%.2f", budget.limitAmount)} (${budget.period.displayName})",
+                            Icons.Default.AccountBalanceWallet,
+                            budget.emoji.takeIf { it.isNotBlank() } ?: "💰"
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Quadruple("Budget", "Deleted budget", Icons.Default.AccountBalanceWallet, "💰")
+                    }
                 }
                 "SALARY_RECORD" -> {
-                    val record = gson.fromJson(item.entityData, SalaryRecord::class.java)
+                    try {
+                        val record = gson.fromJson(item.entityData, SalaryRecord::class.java)
+                        if (record == null) {
+                            return@remember Quadruple("Salary", "Deleted salary record", Icons.Default.Payments, "💰")
+                        }
+                        
+                        Quadruple(
+                            "Salary: ${record.month}/${record.year}",
+                            "Income • ${String.format("%.2f", record.amount)}",
+                            Icons.Default.Payments,
+                            "💰"
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        Quadruple("Salary", "Deleted salary record", Icons.Default.Payments, "💰")
+                    }
+                }
+                else -> {
                     Quadruple(
-                        "Salary: ${record.month}/${record.year}",
-                        "Income • ${record.amount}",
-                        Icons.Default.Payments,
-                        "💰"
+                        item.entityType.takeIf { it.isNotBlank() } ?: "Unknown",
+                        "Deleted item",
+                        Icons.Default.Info,
+                        "🗑️"
                     )
                 }
-                else -> Quadruple(item.entityType, "Deleted item", Icons.Default.Info, "🗑️")
             }
         } catch (e: Exception) {
-            Quadruple(item.entityType, "Deleted item", Icons.Default.Info, "🗑️")
+            e.printStackTrace()
+            Quadruple("Unknown", "Corrupted data", Icons.Default.Info, "⚠️")
         }
     }
 

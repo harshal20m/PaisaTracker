@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -228,7 +230,7 @@ fun ManagementScreen(
                         }
                     ) {
                         Icon(
-                            if (viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
+                            if (viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.ViewList,
                             contentDescription = "Toggle view mode",
                             tint = MaterialTheme.colorScheme.primary
                         )
@@ -488,7 +490,7 @@ private fun ProjectManagementItem(
             if (!selectionMode) {
                 IconButton(onClick = onToggleComplete) {
                     Icon(
-                        if (projectWithTotal.project.isCompleted) Icons.Default.Undo else Icons.Default.CheckCircle,
+                        if (projectWithTotal.project.isCompleted) Icons.AutoMirrored.Filled.Undo else Icons.Default.CheckCircle,
                         contentDescription = if (projectWithTotal.project.isCompleted) "Reactivate" else "Complete",
                         tint = if (projectWithTotal.project.isCompleted) 
                             MaterialTheme.colorScheme.primary 
@@ -698,7 +700,7 @@ private fun ProjectManagementGridItem(
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
-                            if (projectWithTotal.project.isCompleted) Icons.Default.Undo else Icons.Default.CheckCircle,
+                            if (projectWithTotal.project.isCompleted) Icons.AutoMirrored.Filled.Undo else Icons.Default.CheckCircle,
                             contentDescription = if (projectWithTotal.project.isCompleted) "Reactivate" else "Complete",
                             tint = if (projectWithTotal.project.isCompleted) 
                                 MaterialTheme.colorScheme.primary 

@@ -1,5 +1,6 @@
 package com.example.paisatracker.ui.common
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -88,7 +89,7 @@ fun EmojiPickerSheet(
     var manualInput by remember { mutableStateOf("") }
     var showManualField by remember { mutableStateOf(false) }
 
-    val mostUsedEmojis by viewModel.mostUsedEmojis.collectAsState()
+    val mostUsedEmojis by viewModel.mostUsedEmojis.collectAsStateWithLifecycle()
 
     val suggestions by remember(contextHint, mostUsedEmojis) {
         derivedStateOf {

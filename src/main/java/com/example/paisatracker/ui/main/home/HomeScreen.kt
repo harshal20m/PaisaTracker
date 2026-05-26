@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -66,19 +67,19 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     val analyticsViewModel = remember { AnalyticsViewModel(application.repository) }
 
     // ── Currency ──────────────────────────────────────────────────────────────
-    val currency by viewModel.currentCurrency.collectAsState()
+    val currency by viewModel.currentCurrency.collectAsStateWithLifecycle()
     LaunchedEffect(currency) { CurrentCurrency.set(currency) }
 
     // ── Panel toggle state ────────────────────────────────────────────────────
     var recentExpanded by remember { mutableStateOf(false) }
 
     // ── Totals ────────────────────────────────────────────────────────────────
-    val activeProjects by viewModel.getAllProjectsWithTotal().collectAsState(initial = emptyList())
+    val activeProjects by viewModel.getAllProjectsWithTotal().collectAsStateWithLifecycle(initialValue = emptyList())
     val totalSpent = activeProjects.sumOf { it.totalAmount }
     val totalCategories = activeProjects.sumOf { it.categoryCount }
     val totalExpenses = activeProjects.sumOf { it.expenseCount }
-    val recentExpenses by viewModel.recentExpenses.collectAsState(initial = emptyList())
-    val updateAvailable by viewModel.updateAvailable.collectAsState()
+    val recentExpenses by viewModel.recentExpenses.collectAsStateWithLifecycle(initialValue = emptyList())
+    val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
 
     // ── Sheet state ───────────────────────────────────────────────────────────
     var showAssetsSheet by remember { mutableStateOf(false) }

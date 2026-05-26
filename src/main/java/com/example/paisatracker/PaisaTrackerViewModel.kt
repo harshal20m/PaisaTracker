@@ -597,6 +597,22 @@ class PaisaTrackerViewModel(
     }
     fun getExpensesForCategory(categoryId: Long): Flow<List<Expense>> =
         repository.getExpensesForCategory(categoryId)
+    
+    suspend fun getExpensesForCategoryByYear(
+        categoryId: Long,
+        year: Int
+    ): List<Expense> {
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(year, 0, 1, 0, 0, 0)
+        calendar.set(java.util.Calendar.MILLISECOND, 0)
+        val startOfYear = calendar.timeInMillis
+        
+        calendar.set(year + 1, 0, 1, 0, 0, 0)
+        val endOfYear = calendar.timeInMillis
+        
+        return repository.getExpensesForCategoryByYear(categoryId, startOfYear, endOfYear)
+    }
+    
     fun insertExpenseWithResult(expense: Expense, onInserted: (Long) -> Unit) {
         viewModelScope.launch {
             val newId = repository.insertExpense(expense)

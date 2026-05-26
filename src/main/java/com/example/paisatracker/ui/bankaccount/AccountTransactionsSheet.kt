@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -81,7 +83,7 @@ fun AccountTransactionsSheet(
                 currencySymbol = currencySymbol
             )
 
-            Divider(
+            HorizontalDivider(
                 modifier = Modifier.padding(vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
@@ -187,7 +189,7 @@ private fun AccountTransactionsHeader(
             SummaryCard(
                 label = "Total Spent",
                 value = formatCurrency(totalAmount, Currency("INR", currencySymbol, "Indian Rupee", "India", "🇮🇳")),
-                icon = Icons.Default.TrendingDown,
+                icon = Icons.AutoMirrored.Filled.TrendingDown,
                 modifier = Modifier.weight(1f),
                 valueColor = MaterialTheme.colorScheme.error
             )

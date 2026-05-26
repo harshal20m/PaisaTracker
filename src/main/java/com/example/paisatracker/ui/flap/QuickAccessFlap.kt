@@ -37,11 +37,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,10 +78,10 @@ private val VERTICAL_PADDING = 60.dp // Safe area padding for top/bottom
 fun QuickAccessFlap(
     viewModel: PaisaTrackerViewModel,
 ) {
-    val isExpanded by viewModel.isFlapExpanded.collectAsState()
-    val selectedTab by viewModel.flapSelectedTab.collectAsState()
+    val isExpanded by viewModel.isFlapExpanded.collectAsStateWithLifecycle()
+    val selectedTab by viewModel.flapSelectedTab.collectAsStateWithLifecycle()
     // ✅ Collect persisted offset from ViewModel
-    val persistedOffset by viewModel.flapButtonOffsetY.collectAsState()
+    val persistedOffset by viewModel.flapButtonOffsetY.collectAsStateWithLifecycle()
 
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current

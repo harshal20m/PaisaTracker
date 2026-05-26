@@ -335,6 +335,12 @@ class PaisaTrackerRepository(
     }
 
     fun getExpensesForCategory(categoryId: Long): Flow<List<Expense>> = expenseDao.getExpensesForCategory(categoryId)
+    suspend fun getExpensesForCategoryByYear(
+        categoryId: Long,
+        startOfYear: Long,
+        endOfYear: Long
+    ): List<Expense> = expenseDao.getExpensesForCategoryByYear(categoryId, startOfYear, endOfYear)
+
     suspend fun getExpensesForCategoryList(categoryId: Long): List<Expense> = expenseDao.getExpensesForCategoryList(categoryId)
 
     fun getExpenseById(id: Long): Flow<Expense?> = expenseDao.getExpenseById(id)

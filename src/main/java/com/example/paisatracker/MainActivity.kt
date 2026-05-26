@@ -13,10 +13,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -86,10 +86,10 @@ class MainActivity : FragmentActivity() {
         viewModel.checkForUpdates(isManual = false)
 
         setContent {
-            val currentTheme by themePreferencesRepository.appTheme.collectAsState(initial = AppTheme.SYSTEM_DEFAULT)
+            val currentTheme by themePreferencesRepository.appTheme.collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM_DEFAULT)
 
             // Observe currency changes
-            val currentCurrency by viewModel.currentCurrency.collectAsState()
+            val currentCurrency by viewModel.currentCurrency.collectAsStateWithLifecycle()
 
             // Update CurrentCurrency singleton whenever currency changes
             LaunchedEffect(currentCurrency) {
@@ -145,15 +145,15 @@ class MainActivity : FragmentActivity() {
 
     @Composable
     private fun AppContent() {
-        val isAppLockEnabled by appLockPrefs.isAppLockEnabled.collectAsState(initial = false)
-        val isBiometricEnabled by appLockPrefs.isBiometricEnabled.collectAsState(initial = false)
-        val pinCode by appLockPrefs.pinCode.collectAsState(initial = null)
+        val isAppLockEnabled by appLockPrefs.isAppLockEnabled.collectAsStateWithLifecycle(initialValue = false)
+        val isBiometricEnabled by appLockPrefs.isBiometricEnabled.collectAsStateWithLifecycle(initialValue = false)
+        val pinCode by appLockPrefs.pinCode.collectAsStateWithLifecycle(initialValue = null)
 
         when {
             isAppLockEnabled && !isUnlocked && pinCode != null -> {
                 AppLockScreen(
                     onUnlock = { isUnlocked = true },
-                    correctPin = pinCode!!,
+                    correctPin = pinCode ?: "",
                     biometricEnabled = isBiometricEnabled
                 )
             }

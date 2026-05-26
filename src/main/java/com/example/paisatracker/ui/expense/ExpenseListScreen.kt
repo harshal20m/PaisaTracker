@@ -1,22 +1,5 @@
 package com.example.paisatracker.ui.expense
 
-
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-  import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Card
- import androidx.compose.material3.Icon
- import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
-
-import androidx.compose.ui.unit.dp
-
 import android.Manifest
 import android.content.Context
 import android.net.Uri
@@ -37,6 +20,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.paisatracker.domain.models.groupByYearAndMonth
+import com.example.paisatracker.domain.models.YearGroup
+import com.example.paisatracker.domain.models.MonthGroup
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -137,13 +132,18 @@ fun ExpenseListScreen(
     categoryId: Long,
     navController: NavController
 ) {
-    val category by viewModel.getCategoryById(categoryId).collectAsState(initial = null)
+    val category by viewModel.getCategoryById(categoryId).collectAsStateWithLifecycle(initialValue = null)
     val expenses by viewModel.getExpensesForCategory(categoryId)
-        .collectAsState(initial = emptyList())
+        .collectAsStateWithLifecycle(initialValue = emptyList())
 
     // sort state
     var expenseSortOption by remember { mutableStateOf(SortOption.DATE_NEW_OLD) }
     var currentViewType by remember { mutableStateOf(ExpenseViewType.GRID) }
+    
+    // Grouping state
+    var enableGrouping by remember { mutableStateOf(true) }
+    var loadedYears by remember { mutableStateOf(setOf<Int>()) }
+    var isLoadingYear by remember { mutableStateOf(false) }
 
     var currentSheet by remember { mutableStateOf<SheetState?>(null) }
 
@@ -248,6 +248,37 @@ fun ExpenseListScreen(
             SortOption.DATE_NEW_OLD -> expenses.sortedByDescending { it.date }
         }
     }
+    
+    // Group expenses by year and month
+    val groupedExpenses = remember(sortedExpenses, enableGrouping) {
+        if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD) {
+            sortedExpenses.groupByYearAndMonth()
+        } else {
+            emptyList()
+        }
+    }
+    
+    // Get current year
+    val currentYear = remember {
+        java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    }
+    
+    // Initialize with current year loaded
+    LaunchedEffect(Unit) {
+        loadedYears = setOf(currentYear)
+    }
+    
+    // Filter to show only loaded years
+    val visibleYearGroups = remember(groupedExpenses, loadedYears) {
+        groupedExpenses.filter { it.year in loadedYears }
+    }
+    
+    // Get next year to load (oldest year - 1)
+    val nextYearToLoad = remember(groupedExpenses, loadedYears) {
+        val allYears = groupedExpenses.map { it.year }.toSet()
+        val unloadedYears = allYears - loadedYears
+        unloadedYears.minOrNull()
+    }
 
     // Include a null item at the start to represent the "Add New" card
     val listItems = remember(sortedExpenses) {
@@ -308,84 +339,152 @@ fun ExpenseListScreen(
 
                 when (currentViewType) {
                     ExpenseViewType.LIST -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(listItems, key = { it?.id ?: "ADD" }) { expense ->
-                                if (expense == null) {
-                                    AddExpenseListItem(onClick = onAddNewExpenseClick)
-                                } else {
-                                    ExpenseListItem(
-                                        expense = expense,
-                                        onClick = { navController.navigate("expense_details/${expense.id}") },
-                                        onEditClick = {
-                                            expenseToEditPrep(
-                                                expense,
-                                                onSetAmount = { editedExpenseAmount = it },
-                                                onSetDesc = { editedExpenseDescription = it },
-                                                onSetDate = { editedExpenseDate = it },
-                                                onSetMethod = { editedPaymentMethod = it }
-                                            )
-                                            editedExpenseImageUri = null
-                                            currentSheet = SheetState.Edit(expense)
-                                        },
-                                        onDeleteClick = { currentSheet = SheetState.Delete(expense) }
+                        if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
+                            // Grouped view
+                            GroupedExpenseListView(
+                                yearGroups = visibleYearGroups,
+                                nextYearToLoad = nextYearToLoad,
+                                isLoadingYear = isLoadingYear,
+                                currencySymbol = category?.emoji ?: "₹",
+                                onAddExpenseClick = onAddNewExpenseClick,
+                                onExpenseClick = { navController.navigate("expense_details/${it.id}") },
+                                onEditClick = { expense ->
+                                    expenseToEditPrep(
+                                        expense,
+                                        onSetAmount = { editedExpenseAmount = it },
+                                        onSetDesc = { editedExpenseDescription = it },
+                                        onSetDate = { editedExpenseDate = it },
+                                        onSetMethod = { editedPaymentMethod = it }
                                     )
+                                    editedExpenseImageUri = null
+                                    currentSheet = SheetState.Edit(expense)
+                                },
+                                onDeleteClick = { currentSheet = SheetState.Delete(it) },
+                                onLoadMoreClick = {
+                                    nextYearToLoad?.let { year ->
+                                        isLoadingYear = true
+                                        scope.launch {
+                                            loadedYears = loadedYears + year
+                                            isLoadingYear = false
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            // Original flat list view
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(listItems, key = { it?.id ?: "ADD" }) { expense ->
+                                    if (expense == null) {
+                                        AddExpenseListItem(onClick = onAddNewExpenseClick)
+                                    } else {
+                                        ExpenseListItem(
+                                            expense = expense,
+                                            onClick = { navController.navigate("expense_details/${expense.id}") },
+                                            onEditClick = {
+                                                expenseToEditPrep(
+                                                    expense,
+                                                    onSetAmount = { editedExpenseAmount = it },
+                                                    onSetDesc = { editedExpenseDescription = it },
+                                                    onSetDate = { editedExpenseDate = it },
+                                                    onSetMethod = { editedPaymentMethod = it }
+                                                )
+                                                editedExpenseImageUri = null
+                                                currentSheet = SheetState.Edit(expense)
+                                            },
+                                            onDeleteClick = { currentSheet = SheetState.Delete(expense) }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
                     ExpenseViewType.GRID -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            items(
-                                items = listItems.chunked(2)
-                            ) { rowItems ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    rowItems.forEach { expense ->
-                                        if (expense == null) {
-                                            AddExpenseGridItem(
-                                                onClick = onAddNewExpenseClick,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        } else {
-                                            ExpenseGridItem(
-                                                expense = expense,
-                                                onClick = { navController.navigate("expense_details/${expense.id}") },
-                                                onEditClick = {
-                                                    expenseToEditPrep(
-                                                        expense,
-                                                        onSetAmount = { editedExpenseAmount = it },
-                                                        onSetDesc = { editedExpenseDescription = it },
-                                                        onSetDate = { editedExpenseDate = it },
-                                                        onSetMethod = { editedPaymentMethod = it }
-                                                    )
-                                                    editedExpenseImageUri = null
-                                                    currentSheet = SheetState.Edit(expense)
-                                                },
-                                                onDeleteClick = { currentSheet = SheetState.Delete(expense) },
-                                                modifier = Modifier.weight(1f)
-                                            )
+                        if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
+                            // Grouped grid view
+                            GroupedExpenseGridView(
+                                yearGroups = visibleYearGroups,
+                                nextYearToLoad = nextYearToLoad,
+                                isLoadingYear = isLoadingYear,
+                                currencySymbol = category?.emoji ?: "₹",
+                                onAddExpenseClick = onAddNewExpenseClick,
+                                onExpenseClick = { navController.navigate("expense_details/${it.id}") },
+                                onEditClick = { expense ->
+                                    expenseToEditPrep(
+                                        expense,
+                                        onSetAmount = { editedExpenseAmount = it },
+                                        onSetDesc = { editedExpenseDescription = it },
+                                        onSetDate = { editedExpenseDate = it },
+                                        onSetMethod = { editedPaymentMethod = it }
+                                    )
+                                    editedExpenseImageUri = null
+                                    currentSheet = SheetState.Edit(expense)
+                                },
+                                onDeleteClick = { currentSheet = SheetState.Delete(it) },
+                                onLoadMoreClick = {
+                                    nextYearToLoad?.let { year ->
+                                        isLoadingYear = true
+                                        scope.launch {
+                                            loadedYears = loadedYears + year
+                                            isLoadingYear = false
                                         }
                                     }
-                                    if (rowItems.size == 1) {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                }
+                            )
+                        } else {
+                            // Original flat grid view
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(
+                                    items = listItems.chunked(2)
+                                ) { rowItems ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        rowItems.forEach { expense ->
+                                            if (expense == null) {
+                                                AddExpenseGridItem(
+                                                    onClick = onAddNewExpenseClick,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            } else {
+                                                ExpenseGridItem(
+                                                    expense = expense,
+                                                    onClick = { navController.navigate("expense_details/${expense.id}") },
+                                                    onEditClick = {
+                                                        expenseToEditPrep(
+                                                            expense,
+                                                            onSetAmount = { editedExpenseAmount = it },
+                                                            onSetDesc = { editedExpenseDescription = it },
+                                                            onSetDate = { editedExpenseDate = it },
+                                                            onSetMethod = { editedPaymentMethod = it }
+                                                        )
+                                                        editedExpenseImageUri = null
+                                                        currentSheet = SheetState.Edit(expense)
+                                                    },
+                                                    onDeleteClick = { currentSheet = SheetState.Delete(expense) },
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                        if (rowItems.size == 1) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    }
                 }
-            }
 
             // Show ModalBottomSheet when currentSheet != null
             currentSheet?.let { sheet ->
@@ -525,48 +624,50 @@ fun AddExpenseListItem(onClick: () -> Unit, modifier: Modifier = Modifier) {
             .drawWithCache {
                 val stroke = Stroke(
                     width = 2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(24f, 24f), 0f)
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f)
                 )
                 onDrawWithContent {
                     drawContent()
                     drawRoundRect(
                         color = dashColor,
                         style = stroke,
-                        cornerRadius = CornerRadius(16.dp.toPx())
+                        cornerRadius = CornerRadius(12.dp.toPx())
                     )
                 }
             }
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+        ),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 20.dp, horizontal = 16.dp),
+                .padding(12.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(44.dp)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Add Expense",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add Expense",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(22.dp)
+                )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Add New Expense",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -580,50 +681,52 @@ fun AddExpenseGridItem(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(140.dp)
             .drawWithCache {
                 val stroke = Stroke(
                     width = 2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(24f, 24f), 0f)
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f)
                 )
                 onDrawWithContent {
                     drawContent()
                     drawRoundRect(
                         color = dashColor,
                         style = stroke,
-                        cornerRadius = CornerRadius(16.dp.toPx())
+                        cornerRadius = CornerRadius(12.dp.toPx())
                     )
                 }
             }
             .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+        )
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(56.dp)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Add Expense",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add Expense",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "Add Expense",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -892,209 +995,134 @@ fun ExpenseListItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp,
-            hoveredElevation = 6.dp
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f),
-                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.08f),
-                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.04f)
-                        )
-                    )
-                )
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp)
+            // Left: Icon + Description + Date
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Payment Icon
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (iconRes != null) {
-                                Icon(
-                                    painter = painterResource(id = iconRes),
-                                    contentDescription = expense.paymentMethod,
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_expense_icon),
-                                    contentDescription = "Expense Icon",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = expense.description,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = 16.sp,
-                                lineHeight = 19.sp
-                            )
-                        }
-                    }
-
-                    Box {
-                        IconButton(
-                            onClick = { menuExpanded = true },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = "More Options",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text("Edit", style = MaterialTheme.typography.bodyMedium)
-                                    }
-                                },
-                                onClick = {
-                                    onEditClick()
-                                    menuExpanded = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp),
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            "Delete",
-                                            color = MaterialTheme.colorScheme.error,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    onDeleteClick()
-                                    menuExpanded = false
-                                }
-                            )
-                        }
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = expense.paymentMethod,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_expense_icon),
+                            contentDescription = "Expense",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Description + Date
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = expense.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = formatDate(expense.date),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
+            }
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                    thickness = 0.5.dp
+            // Right: Amount + Menu
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = formatCurrency(expense.amount),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.36f),
-                                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.18f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
+                Box {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.DateRange,
-                                contentDescription = null,
-                                modifier = Modifier.size(13.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = formatDate(expense.date),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontSize = 12.sp
-                            )
-                        }
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                                    )
-                                )
-                            )
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
                     ) {
-                        Text(
-                            text = formatCurrency(expense.amount),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                            fontSize = 16.sp
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Edit", style = MaterialTheme.typography.bodyMedium)
+                                }
+                            },
+                            onClick = {
+                                onEditClick()
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        "Delete",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            },
+                            onClick = {
+                                onDeleteClick()
+                                menuExpanded = false
+                            }
                         )
                     }
                 }
@@ -1117,150 +1145,113 @@ fun ExpenseGridItem(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp)
-            .shadow(
-                elevation = 4.dp,
-                shape = RoundedCornerShape(16.dp)
-            )
+            .height(140.dp)
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-                            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.15f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+            // Top: Icon + Menu
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (iconRes != null) {
-                                Icon(
-                                    painter = painterResource(id = iconRes),
-                                    contentDescription = expense.paymentMethod,
-                                    tint = Color.Unspecified,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_expense_icon),
-                                    contentDescription = "Expense",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-
-                        Box {
-                            IconButton(
-                                onClick = { menuExpanded = true },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = "More",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Edit", style = MaterialTheme.typography.bodyMedium) },
-                                    onClick = {
-                                        onEditClick()
-                                        menuExpanded = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Delete", style = MaterialTheme.typography.bodyMedium) },
-                                    onClick = {
-                                        onDeleteClick()
-                                        menuExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = expense.description,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 16.sp,
-                        lineHeight = 19.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = formatCurrency(expense.amount),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 19.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.DateRange,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = formatDate(expense.date),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
+                    if (iconRes != null) {
+                        Icon(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = expense.paymentMethod,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_expense_icon),
+                            contentDescription = "Expense",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
+
+                Box {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit", style = MaterialTheme.typography.bodyMedium) },
+                            onClick = {
+                                onEditClick()
+                                menuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", style = MaterialTheme.typography.bodyMedium) },
+                            onClick = {
+                                onDeleteClick()
+                                menuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Middle: Description
+            Text(
+                text = expense.description,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                lineHeight = 18.sp
+            )
+
+            // Bottom: Amount + Date
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = formatCurrency(expense.amount),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = formatDate(expense.date),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
             }
         }
     }
@@ -1279,4 +1270,168 @@ private fun String?.toPaymentIconKey(): String? = when (this) {
     "Cash" -> "Cash"
     "Card" -> "Card"
     else -> null
+}
+// Grouped Expense List View
+@Composable
+private fun GroupedExpenseListView(
+    yearGroups: List<YearGroup>,
+    nextYearToLoad: Int?,
+    isLoadingYear: Boolean,
+    currencySymbol: String,
+    onAddExpenseClick: () -> Unit,
+    onExpenseClick: (Expense) -> Unit,
+    onEditClick: (Expense) -> Unit,
+    onDeleteClick: (Expense) -> Unit,
+    onLoadMoreClick: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Add expense button at top
+        item(key = "ADD_BUTTON") {
+            AddExpenseListItem(onClick = onAddExpenseClick)
+        }
+        
+        // Iterate through year groups
+        yearGroups.forEachIndexed { yearIndex, yearGroup ->
+            // Year separator (except for first year)
+            if (yearIndex > 0) {
+                item(key = "YEAR_SEP_${yearGroup.year}") {
+                    YearSeparator(year = yearGroup.year)
+                }
+            }
+            
+            // Month groups within the year
+            yearGroup.monthGroups.forEach { monthGroup ->
+                // Month header
+                item(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
+                    CompactMonthHeader(
+                        monthGroup = monthGroup,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                
+                // Expenses in this month
+                items(
+                    items = monthGroup.expenses,
+                    key = { expense -> "EXP_${expense.id}" }
+                ) { expense ->
+                    ExpenseListItem(
+                        expense = expense,
+                        onClick = { onExpenseClick(expense) },
+                        onEditClick = { onEditClick(expense) },
+                        onDeleteClick = { onDeleteClick(expense) }
+                    )
+                }
+            }
+        }
+        
+        // Load more button
+        if (nextYearToLoad != null) {
+            item(key = "LOAD_MORE") {
+                LoadMoreYearButton(
+                    year = nextYearToLoad,
+                    isLoading = isLoadingYear,
+                    onClick = onLoadMoreClick,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+        }
+    }
+}
+
+
+// Grouped Expense Grid View
+@Composable
+private fun GroupedExpenseGridView(
+    yearGroups: List<YearGroup>,
+    nextYearToLoad: Int?,
+    isLoadingYear: Boolean,
+    currencySymbol: String,
+    onAddExpenseClick: () -> Unit,
+    onExpenseClick: (Expense) -> Unit,
+    onEditClick: (Expense) -> Unit,
+    onDeleteClick: (Expense) -> Unit,
+    onLoadMoreClick: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Add expense button at top (in grid format)
+        item(key = "ADD_BUTTON") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AddExpenseGridItem(
+                    onClick = onAddExpenseClick,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+        
+        // Iterate through year groups
+        yearGroups.forEachIndexed { yearIndex, yearGroup ->
+            // Year separator (except for first year)
+            if (yearIndex > 0) {
+                item(key = "YEAR_SEP_${yearGroup.year}") {
+                    YearSeparator(year = yearGroup.year)
+                }
+            }
+            
+            // Month groups within the year
+            yearGroup.monthGroups.forEach { monthGroup ->
+                // Month header
+                item(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
+                    CompactMonthHeader(
+                        monthGroup = monthGroup,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                
+                // Expenses in this month (in grid format - 2 columns)
+                val chunkedExpenses = monthGroup.expenses.chunked(2)
+                items(
+                    items = chunkedExpenses,
+                    key = { rowExpenses -> "ROW_${rowExpenses.firstOrNull()?.id ?: 0}" }
+                ) { rowExpenses ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowExpenses.forEach { expense ->
+                            ExpenseGridItem(
+                                expense = expense,
+                                onClick = { onExpenseClick(expense) },
+                                onEditClick = { onEditClick(expense) },
+                                onDeleteClick = { onDeleteClick(expense) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        // Add spacer if only one item in row
+                        if (rowExpenses.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Load more button
+        if (nextYearToLoad != null) {
+            item(key = "LOAD_MORE") {
+                LoadMoreYearButton(
+                    year = nextYearToLoad,
+                    isLoading = isLoadingYear,
+                    onClick = onLoadMoreClick,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            }
+        }
+    }
 }

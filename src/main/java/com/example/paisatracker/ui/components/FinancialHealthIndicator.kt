@@ -6,6 +6,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +27,7 @@ import com.example.paisatracker.ui.theme.PaisaTrackerTheme
 import java.text.NumberFormat
 import java.util.*
 
+import com.example.paisatracker.util.formatCurrency
 /**
  * FinancialHealthIndicator - A Material 3 component for displaying overall financial health
  * 
@@ -234,14 +237,14 @@ private fun HealthMetrics(
         MetricRow(
             label = "Income",
             value = formatCurrency(financialState.totalIncome, currencySymbol),
-            icon = Icons.Default.TrendingUp,
+            icon = Icons.AutoMirrored.Filled.TrendingUp,
             color = Color(0xFF4CAF50)
         )
         
         MetricRow(
             label = "Expenses",
             value = formatCurrency(financialState.totalExpenses, currencySymbol),
-            icon = Icons.Default.TrendingDown,
+            icon = Icons.AutoMirrored.Filled.TrendingDown,
             color = MaterialTheme.colorScheme.error
         )
         
@@ -449,13 +452,6 @@ private fun generateInsights(state: FinancialState, status: HealthStatus): List<
     }
     
     return insights
-}
-
-private fun formatCurrency(value: Double, symbol: String): String {
-    val formatter = NumberFormat.getNumberInstance(Locale("en", "IN"))
-    formatter.minimumFractionDigits = 0
-    formatter.maximumFractionDigits = 0
-    return "$symbol ${formatter.format(value)}"
 }
 
 // ============================================================================

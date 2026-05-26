@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -17,9 +18,9 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,14 +46,14 @@ fun ProjectListScreen(viewModel: PaisaTrackerViewModel, navController: NavContro
     val scope       = rememberCoroutineScope()
 
     // ── Currency ──────────────────────────────────────────────────────────────
-    val currency by viewModel.currentCurrency.collectAsState()
+    val currency by viewModel.currentCurrency.collectAsStateWithLifecycle()
     LaunchedEffect(currency) { CurrentCurrency.set(currency) }
 
     // ── Projects + custom ordering ────────────────────────────────────────────
     var showCompleted by remember { mutableStateOf(false) }
     var useMasonryLayout by remember { mutableStateOf(true) } // Default to masonry grid
-    val activeProjects by viewModel.getAllProjectsWithTotal().collectAsState(initial = emptyList())
-    val completedProjects by viewModel.getCompletedProjectsWithTotal().collectAsState(initial = emptyList())
+    val activeProjects by viewModel.getAllProjectsWithTotal().collectAsStateWithLifecycle(initialValue = emptyList())
+    val completedProjects by viewModel.getCompletedProjectsWithTotal().collectAsStateWithLifecycle(initialValue = emptyList())
     
     val projects = if (showCompleted) completedProjects else activeProjects
     val sharedPrefs = remember {
@@ -140,7 +141,7 @@ fun ProjectListScreen(viewModel: PaisaTrackerViewModel, navController: NavContro
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                if (useMasonryLayout) Icons.Default.ViewList else Icons.Default.GridView,
+                                if (useMasonryLayout) Icons.AutoMirrored.Filled.ViewList else Icons.Default.GridView,
                                 contentDescription = if (useMasonryLayout) "Switch to List" else "Switch to Grid",
                                 tint = MaterialTheme.colorScheme.primary
                             )
