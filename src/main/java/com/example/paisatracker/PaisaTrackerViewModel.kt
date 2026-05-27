@@ -567,8 +567,15 @@ class PaisaTrackerViewModel(
                 if (isCompleted) "Project '$projectName' marked as completed"
                 else "Project '$projectName' reopened"
             )
+            // Trigger analytics refresh to update insights immediately
+            // Note: Analytics screens should observe this and refresh their ViewModels
+            _projectStatusChanged.value = System.currentTimeMillis()
         }
     }
+    
+    // Observable for analytics refresh trigger
+    private val _projectStatusChanged = MutableStateFlow(0L)
+    val projectStatusChanged: StateFlow<Long> = _projectStatusChanged.asStateFlow()
     fun deleteProject(project: Project) {
         viewModelScope.launch {
             recordDeletion("PROJECT", project)

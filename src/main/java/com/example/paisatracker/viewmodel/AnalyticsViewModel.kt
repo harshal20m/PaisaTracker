@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.onStart
 
 /**
  * ViewModel for Analytics features.
@@ -53,6 +54,12 @@ class AnalyticsViewModel(
     val customDateRange: StateFlow<DateRange?> = _customDateRange.asStateFlow()
 
     /**
+     * Refresh trigger for analytics data.
+     * Incremented whenever analytics need to be refreshed (e.g., project status change).
+     */
+    private val _refreshTrigger = MutableStateFlow(0L)
+
+    /**
      * Get the current date range based on selected period.
      */
     val currentDateRange: StateFlow<DateRange> = combine(
@@ -76,16 +83,19 @@ class AnalyticsViewModel(
      * Get monthly spending trends for the last 12 months.
      * Returns UiState with loading, success, error, or empty states.
      */
-    val monthlyTrends: StateFlow<UiState<List<MonthlyTotal>>> = repository.getMonthlyTotals(12)
-        .map { totals ->
-            if (totals.isEmpty()) {
-                UiState.Empty
-            } else {
-                UiState.Success(totals)
-            }
-        }
-        .catch { e ->
-            emit(UiState.Error(e.message ?: "Failed to load monthly trends", e))
+    val monthlyTrends: StateFlow<UiState<List<MonthlyTotal>>> = _refreshTrigger
+        .flatMapLatest {
+            repository.getMonthlyTotals(12)
+                .map { totals ->
+                    if (totals.isEmpty()) {
+                        UiState.Empty
+                    } else {
+                        UiState.Success(totals)
+                    }
+                }
+                .catch { e ->
+                    emit(UiState.Error(e.message ?: "Failed to load monthly trends", e))
+                }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
@@ -97,16 +107,19 @@ class AnalyticsViewModel(
      * Get yearly spending trends for all years with data.
      * Returns UiState with loading, success, error, or empty states.
      */
-    val yearlyTrends: StateFlow<UiState<List<YearlyTotal>>> = repository.getYearlyTotals()
-        .map { totals ->
-            if (totals.isEmpty()) {
-                UiState.Empty
-            } else {
-                UiState.Success(totals)
-            }
-        }
-        .catch { e ->
-            emit(UiState.Error(e.message ?: "Failed to load yearly trends", e))
+    val yearlyTrends: StateFlow<UiState<List<YearlyTotal>>> = _refreshTrigger
+        .flatMapLatest {
+            repository.getYearlyTotals()
+                .map { totals ->
+                    if (totals.isEmpty()) {
+                        UiState.Empty
+                    } else {
+                        UiState.Success(totals)
+                    }
+                }
+                .catch { e ->
+                    emit(UiState.Error(e.message ?: "Failed to load yearly trends", e))
+                }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
@@ -118,7 +131,10 @@ class AnalyticsViewModel(
      * Get category-wise spending for the current selected period.
      * Automatically calculates percentages.
      */
-    val categorySpending: StateFlow<UiState<List<CategorySpending>>> = currentDateRange
+    val categorySpending: StateFlow<UiState<List<CategorySpending>>> = combine(
+        currentDateRange,
+        _refreshTrigger
+    ) { range, _ -> range }
         .flatMapLatest { range ->
             repository.getCategorySpendingByDateRange(range.start, range.end)
                 .map { categories ->
@@ -215,7 +231,10 @@ class AnalyticsViewModel(
     /**
      * Get statistical analysis for the current period.
      */
-    val statistics: StateFlow<UiState<com.example.paisatracker.domain.models.AnalyticsStatistics>> = currentDateRange
+    val statistics: StateFlow<UiState<com.example.paisatracker.domain.models.AnalyticsStatistics>> = combine(
+        currentDateRange,
+        _refreshTrigger
+    ) { range, _ -> range }
         .map { range ->
             try {
                 val total = repository.getTotalByDateRange(range.start, range.end)
@@ -307,12 +326,16 @@ class AnalyticsViewModel(
 
     /**
      * Refresh all analytics data.
-     * Useful for pull-to-refresh functionality.
+     * Useful for pull-to-refresh functionality or when project status changes.
+     *
+     * This method should be called when:
+     * - User pulls to refresh
+     * - Project is closed/reopened
+     * - Category is added/removed
+     * - Any change that affects analytics data
      */
     fun refreshAnalytics() {
-        // Force refresh by re-emitting current period
-        val current = _selectedPeriod.value
-        _selectedPeriod.value = current
+        _refreshTrigger.value = System.currentTimeMillis()
     }
 
     /**

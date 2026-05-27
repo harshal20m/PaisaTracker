@@ -1,9 +1,11 @@
 package com.example.paisatracker.navigation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -96,6 +98,15 @@ fun AppNavigation(
                     (LocalContext.current.applicationContext as PaisaTrackerApplication).repository
                 )
             )
+            
+            // Listen for project status changes and refresh analytics
+            val projectStatusChanged by viewModel.projectStatusChanged.collectAsStateWithLifecycle()
+            LaunchedEffect(projectStatusChanged) {
+                if (projectStatusChanged > 0) {
+                    analyticsViewModel.refreshAnalytics()
+                }
+            }
+            
             AnalyticsScreen(
                 viewModel = analyticsViewModel,
                 onNavigateBack = { navController.popBackStack() },

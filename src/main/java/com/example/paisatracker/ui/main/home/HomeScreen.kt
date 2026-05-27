@@ -65,6 +65,14 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
 
     // ── Analytics ─────────────────────────────────────────────────────────────
     val analyticsViewModel = remember { AnalyticsViewModel(application.repository) }
+    
+    // Listen for project status changes and refresh analytics
+    val projectStatusChanged by viewModel.projectStatusChanged.collectAsStateWithLifecycle()
+    LaunchedEffect(projectStatusChanged) {
+        if (projectStatusChanged > 0) {
+            analyticsViewModel.refreshAnalytics()
+        }
+    }
 
     // ── Currency ──────────────────────────────────────────────────────────────
     val currency by viewModel.currentCurrency.collectAsStateWithLifecycle()

@@ -1,5 +1,7 @@
 package com.example.paisatracker.ui.bin
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,11 +15,14 @@ import androidx.compose.material3.*
 import com.example.paisatracker.ui.common.ScreenHeader
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -29,8 +34,12 @@ import com.example.paisatracker.data.Project
 import com.example.paisatracker.data.Category
 import com.example.paisatracker.data.Budget
 import com.example.paisatracker.data.SalaryRecord
+import com.example.paisatracker.ui.theme.PaisaTrackerTheme
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,11 +116,29 @@ fun BinSheetContent(viewModel: PaisaTrackerViewModel, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(deletedItems, key = { it.id }) { item ->
+                    var showDetailsSheet by remember { mutableStateOf(false) }
+                    
                     BinItemRow(
                         item = item,
                         onRestore = { viewModel.restoreAction(item) },
-                        onDelete = { viewModel.deleteAction(item) }
+                        onDelete = { viewModel.deleteAction(item) },
+                        onClick = { showDetailsSheet = true }
                     )
+                    
+                    if (showDetailsSheet) {
+                        BinItemDetailsSheet(
+                            item = item,
+                            onDismiss = { showDetailsSheet = false },
+                            onRestore = {
+                                viewModel.restoreAction(item)
+                                showDetailsSheet = false
+                            },
+                            onDelete = {
+                                viewModel.deleteAction(item)
+                                showDetailsSheet = false
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -161,7 +188,8 @@ fun BinScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
 fun BinItemRow(
     item: ActionHistory,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit = {}
 ) {
     val daysRemaining = 30 - TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - item.timestamp)
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -308,7 +336,9 @@ fun BinItemRow(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface,
             contentColor = MaterialTheme.colorScheme.onSurface
@@ -408,3 +438,551 @@ data class Quadruple<out A, out B, out C, out D>(
     val third: C,
     val fourth: D
 )
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BinItemDetailsSheet(
+    item: ActionHistory,
+    onDismiss: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val daysRemaining = 30 - TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - item.timestamp)
+    
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            // Header with icon and title
+            val (title, icon, emoji) = remember(item) {
+                try {
+                    val gson = Gson()
+                    when (item.entityType) {
+                        "PROJECT" -> {
+                            val data = gson.fromJson(item.entityData, JsonObject::class.java)
+                            val projectObj = data?.getAsJsonObject("project")
+                            val project = projectObj?.let { gson.fromJson(it, Project::class.java) }
+                            Triple(
+                                project?.name ?: "Project",
+                                Icons.Default.Folder,
+                                project?.emoji ?: "📁"
+                            )
+                        }
+                        "CATEGORY" -> {
+                            val data = gson.fromJson(item.entityData, JsonObject::class.java)
+                            val categoryObj = data?.getAsJsonObject("category")
+                            val category = categoryObj?.let { gson.fromJson(it, Category::class.java) }
+                            Triple(
+                                category?.name ?: "Category",
+                                Icons.Default.Category,
+                                category?.emoji ?: "📂"
+                            )
+                        }
+                        "EXPENSE" -> {
+                            val expense = gson.fromJson(item.entityData, Expense::class.java)
+                            Triple(
+                                expense?.description ?: "Expense",
+                                Icons.AutoMirrored.Filled.ReceiptLong,
+                                null
+                            )
+                        }
+                        "BUDGET" -> {
+                            val budget = gson.fromJson(item.entityData, Budget::class.java)
+                            Triple(
+                                budget?.name ?: "Budget",
+                                Icons.Default.AccountBalanceWallet,
+                                budget?.emoji ?: "💰"
+                            )
+                        }
+                        "SALARY_RECORD" -> {
+                            val record = gson.fromJson(item.entityData, SalaryRecord::class.java)
+                            Triple(
+                                "Salary: ${record?.month}/${record?.year}",
+                                Icons.Default.Payments,
+                                "💰"
+                            )
+                        }
+                        else -> Triple("Unknown Item", Icons.Default.Info, "🗑️")
+                    }
+                } catch (e: Exception) {
+                    Triple("Unknown Item", Icons.Default.Info, "⚠️")
+                }
+            }
+            
+            // Icon and Title Section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (emoji != null) {
+                            Text(text = emoji, fontSize = 32.sp)
+                        } else {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = item.entityType.replace("_", " ").lowercase()
+                            .replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Warning Banner
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Will be permanently deleted in $daysRemaining days",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Details Section
+            when (item.entityType) {
+                "PROJECT" -> ProjectDetailsContent(item)
+                "CATEGORY" -> CategoryDetailsContent(item)
+                "EXPENSE" -> ExpenseDetailsContent(item)
+                "BUDGET" -> BudgetDetailsContent(item)
+                "SALARY_RECORD" -> SalaryDetailsContent(item)
+                else -> GenericDetailsContent(item)
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { showDeleteConfirm = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete Forever")
+                }
+                
+                Button(
+                    onClick = onRestore,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Restore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Restore")
+                }
+            }
+        }
+    }
+    
+    // Delete Confirmation Dialog
+    if (showDeleteConfirm) {
+        val deleteSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showDeleteConfirm = false },
+            sheetState = deleteSheetState
+        ) {
+            DeleteConfirmationSheetContent(
+                title = "Delete Permanently?",
+                message = "This item will be permanently deleted and cannot be recovered. Are you sure?",
+                onConfirm = {
+                    onDelete()
+                    showDeleteConfirm = false
+                },
+                onDismiss = { showDeleteConfirm = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProjectDetailsContent(item: ActionHistory) {
+    val projectData = remember(item) {
+        try {
+            val gson = Gson()
+            val data = gson.fromJson(item.entityData, JsonObject::class.java)
+            val projectObj = data?.getAsJsonObject("project")
+            val project = projectObj?.let { gson.fromJson(it, Project::class.java) }
+            val children = data?.getAsJsonArray("children")
+            val childCount = children?.size() ?: 0
+            
+            val totalExpenses = try {
+                children?.sumOf { childElement ->
+                    try {
+                        val childObj = childElement?.asJsonObject
+                        val expenses = childObj?.getAsJsonArray("expenses")
+                        expenses?.size() ?: 0
+                    } catch (e: Exception) { 0 }
+                } ?: 0
+            } catch (e: Exception) { 0 }
+            
+            Triple(project, childCount, totalExpenses)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    if (projectData == null) {
+        ErrorDetailsContent()
+    } else {
+        val (project, childCount, totalExpenses) = projectData
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Project Details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            DetailRow(label = "Name", value = project?.name ?: "Unknown")
+            DetailRow(label = "Categories", value = "$childCount")
+            DetailRow(label = "Total Expenses", value = "$totalExpenses")
+            DetailRow(
+                label = "Created",
+                value = formatDate(project?.createdAt ?: item.timestamp)
+            )
+            DetailRow(
+                label = "Deleted",
+                value = formatDate(item.timestamp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryDetailsContent(item: ActionHistory) {
+    val categoryData = remember(item) {
+        try {
+            val gson = Gson()
+            val data = gson.fromJson(item.entityData, JsonObject::class.java)
+            val categoryObj = data?.getAsJsonObject("category")
+            val category = categoryObj?.let { gson.fromJson(it, Category::class.java) }
+            val expenses = data?.getAsJsonArray("expenses")
+            val expCount = expenses?.size() ?: 0
+            Pair(category, expCount)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    if (categoryData == null) {
+        ErrorDetailsContent()
+    } else {
+        val (category, expCount) = categoryData
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Category Details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            DetailRow(label = "Name", value = category?.name ?: "Unknown")
+            DetailRow(label = "Expenses", value = "$expCount")
+            DetailRow(
+                label = "Created",
+                value = formatDate(category?.createdAt ?: item.timestamp)
+            )
+            DetailRow(
+                label = "Deleted",
+                value = formatDate(item.timestamp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpenseDetailsContent(item: ActionHistory) {
+    val expense = remember(item) {
+        try {
+            val gson = Gson()
+            gson.fromJson(item.entityData, Expense::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    if (expense == null) {
+        ErrorDetailsContent()
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Expense Details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            DetailRow(
+                label = "Description",
+                value = expense.description?.takeIf { it.isNotBlank() } ?: "No description"
+            )
+            DetailRow(
+                label = "Amount",
+                value = "₹${String.format("%.2f", expense.amount)}"
+            )
+            DetailRow(
+                label = "Date",
+                value = formatDate(expense.date)
+            )
+            expense.paymentMethod?.let {
+                DetailRow(label = "Payment Method", value = it)
+            }
+            expense.assetPath?.let {
+                DetailRow(label = "Has Attachment", value = "Yes")
+            }
+            DetailRow(
+                label = "Deleted",
+                value = formatDate(item.timestamp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BudgetDetailsContent(item: ActionHistory) {
+    val budget = remember(item) {
+        try {
+            val gson = Gson()
+            gson.fromJson(item.entityData, Budget::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    if (budget == null) {
+        ErrorDetailsContent()
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Budget Details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            DetailRow(label = "Name", value = budget.name)
+            DetailRow(
+                label = "Limit",
+                value = "₹${String.format("%.2f", budget.limitAmount)}"
+            )
+            DetailRow(
+                label = "Period",
+                value = budget.period.displayName
+            )
+            DetailRow(
+                label = "Deleted",
+                value = formatDate(item.timestamp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SalaryDetailsContent(item: ActionHistory) {
+    val record = remember(item) {
+        try {
+            val gson = Gson()
+            gson.fromJson(item.entityData, SalaryRecord::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    if (record == null) {
+        ErrorDetailsContent()
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Salary Details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            DetailRow(
+                label = "Period",
+                value = "${record.month}/${record.year}"
+            )
+            DetailRow(
+                label = "Amount",
+                value = "₹${String.format("%.2f", record.amount)}"
+            )
+            DetailRow(
+                label = "Deleted",
+                value = formatDate(item.timestamp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GenericDetailsContent(item: ActionHistory) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Item Details",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        
+        DetailRow(label = "Type", value = item.entityType)
+        DetailRow(label = "Deleted", value = formatDate(item.timestamp))
+    }
+}
+
+@Composable
+private fun ErrorDetailsContent() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Unable to load item details",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+    }
+}
+
+private fun formatDate(timestamp: Long): String {
+    val sdf = SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
+    return sdf.format(Date(timestamp))
+}
+
+// Preview
+@Preview(showBackground = true)
+@Composable
+private fun DetailRowPreview() {
+    PaisaTrackerTheme {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            DetailRow(label = "Name", value = "Monthly Groceries")
+            DetailRow(label = "Amount", value = "₹5,000.00")
+            DetailRow(label = "Date", value = "May 27, 2026 at 06:52 PM")
+        }
+    }
+}
