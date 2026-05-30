@@ -45,6 +45,8 @@ import com.example.paisatracker.ui.search.SearchViewModel
 import com.example.paisatracker.ui.search.SearchViewModelFactory
 import com.example.paisatracker.ui.settings.UpdateRow
 import com.example.paisatracker.ui.bin.BinSheetContent
+import com.example.paisatracker.ui.sms.PendingSmsCompactCard
+import com.example.paisatracker.ui.sms.SmsTransactionViewModel
 import com.example.paisatracker.data.Project
 import com.example.paisatracker.util.CurrentCurrency
 import com.example.paisatracker.viewmodel.AnalyticsViewModel
@@ -62,6 +64,11 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     val searchViewModel: SearchViewModel = viewModel(
         factory = SearchViewModelFactory(application.repository, context)
     )
+
+    // ── SMS Transactions ──────────────────────────────────────────────────────
+    val smsViewModel = remember {
+        SmsTransactionViewModel(application)
+    }
 
     // ── Analytics ─────────────────────────────────────────────────────────────
     val analyticsViewModel = remember { AnalyticsViewModel(application.repository) }
@@ -229,6 +236,12 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                         WeeklyDashboardCalendar(
                             expenses = recentExpenses,
                             onTransactionClick = { navController.navigate("expense_details/$it") }
+                        )
+
+                        // Pending SMS Transactions Card
+                        PendingSmsCompactCard(
+                            viewModel = smsViewModel,
+                            onViewAll = { navController.navigate("pending_sms") }
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))

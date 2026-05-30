@@ -162,7 +162,25 @@ fun SettingsScreen(
                 )
             }
 
+            item(span = StaggeredGridItemSpan.FullLine) { MasonryLabel("SMS Transactions") }
 
+            item {
+                MasonryCard(
+                    icon     = Icons.Default.Message,
+                    title    = "Pending SMS",
+                    subtitle = "Review detected transactions",
+                    onClick  = { navController.navigate("pending_sms") }
+                )
+            }
+
+            item {
+                MasonryCard(
+                    icon     = Icons.Default.Settings,
+                    title    = "SMS Settings",
+                    subtitle = "Auto-create & notifications",
+                    onClick  = { navController.navigate("sms_settings") }
+                )
+            }
 
             item(span = StaggeredGridItemSpan.FullLine) { MasonryLabel("Security") }
 

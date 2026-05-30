@@ -69,6 +69,9 @@ android {
 }
 
 dependencies {
+    // Parser Core Module (SMS Transaction Detection)
+    implementation(project(":parser-core"))
+    
     // Core AndroidX
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

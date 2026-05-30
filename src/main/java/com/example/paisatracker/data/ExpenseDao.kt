@@ -483,4 +483,14 @@ interface ExpenseDao {
         startDate: Long,
         endDate: Long
     ): Double
+
+    /**
+     * Get expense by transaction hash for duplicate detection.
+     * Used by SMS transaction processor to avoid duplicate entries.
+     *
+     * @param hash Transaction hash
+     * @return Expense if found, null otherwise
+     */
+    @Query("SELECT * FROM expenses WHERE description LIKE '%' || :hash || '%' LIMIT 1")
+    suspend fun getExpenseByHash(hash: String): Expense?
 }

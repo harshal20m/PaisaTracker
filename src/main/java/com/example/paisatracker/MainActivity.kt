@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,6 +33,7 @@ import com.example.paisatracker.ui.tour.AppTourSheet
 import com.example.paisatracker.ui.theme.PaisaTrackerTheme
 import com.example.paisatracker.util.CurrentCurrency
 import com.example.paisatracker.util.UpdateManager
+import com.example.paisatracker.receiver.SmsBroadcastReceiver
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -65,6 +67,19 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    private val smsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val receiveSmsGranted = permissions[Manifest.permission.RECEIVE_SMS] ?: false
+        val readSmsGranted = permissions[Manifest.permission.READ_SMS] ?: false
+        
+        if (receiveSmsGranted && readSmsGranted) {
+            Log.d("MainActivity", "SMS permissions granted")
+        } else {
+            Log.d("MainActivity", "SMS permissions denied")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -82,7 +97,11 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+        // Handle SMS notification intents
+        handleIntent(intent)
+
         requestNotificationPermission()
+        requestSmsPermissions()
         viewModel.checkForUpdates(isManual = false)
 
         setContent {
@@ -125,6 +144,48 @@ class MainActivity : FragmentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        when (intent?.action) {
+            SmsBroadcastReceiver.ACTION_VIEW_EXPENSE -> {
+                val expenseId = intent.getLongExtra(SmsBroadcastReceiver.EXTRA_EXPENSE_ID, -1L)
+                if (expenseId != -1L) {
+                    Log.d("MainActivity", "Opening expense from SMS notification: $expenseId")
+                    // TODO: Navigate to expense detail screen
+                    // This will be implemented when UI screens are created
+                }
+            }
+            SmsBroadcastReceiver.ACTION_VIEW_PENDING -> {
+                val notificationId = intent.getLongExtra(SmsBroadcastReceiver.EXTRA_NOTIFICATION_ID, -1L)
+                Log.d("MainActivity", "Opening pending SMS transactions from notification: $notificationId")
+                // The navigation will happen automatically when the app opens
+                // User can navigate to Settings -> SMS Transactions -> View Pending
+            }
+        }
+    }
+
+    private fun requestSmsPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.RECEIVE_SMS)
+        }
+        
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.READ_SMS)
+        }
+        
+        if (permissionsToRequest.isNotEmpty()) {
+            smsPermissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 

@@ -38,6 +38,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :categoryId")
     fun getCategoryById(categoryId: Long): Flow<Category>
 
+    @Query("SELECT * FROM categories WHERE id = :categoryId")
+    suspend fun getCategoryByIdSync(categoryId: Long): Category?
+
     @Query("SELECT * FROM categories WHERE name = :name AND projectId = :projectId LIMIT 1")
     suspend fun getCategoryByName(name: String, projectId: Long): Category?
 
@@ -64,6 +67,32 @@ interface CategoryDao {
     @Query("SELECT * FROM categories ORDER BY name ASC")
     suspend fun getAllCategoriesList(): List<Category>
 
+    /**
+     * Get category by name (without project filter).
+     * Used by SMS transaction processor to find existing categories.
+     *
+     * @param name Category name
+     * @return Category if found, null otherwise
+     */
+    @Query("SELECT * FROM categories WHERE name = :name LIMIT 1")
+    suspend fun getCategoryByName(name: String): Category?
 
+    /**
+     * Insert a new category and return its ID.
+     * Used by SMS transaction processor to create new categories.
+     *
+     * @param category Category to insert
+     * @return ID of inserted category
+     */
+    @Insert
+    suspend fun insert(category: Category): Long
 
+    /**
+     * Get the default project (first active project).
+     * Used by SMS transaction processor when creating categories.
+     *
+     * @return First active project or null
+     */
+    @Query("SELECT * FROM projects WHERE isCompleted = 0 ORDER BY id ASC LIMIT 1")
+    suspend fun getDefaultProject(): Project?
 }

@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "PaisaTracker"
+include(":parser-core")

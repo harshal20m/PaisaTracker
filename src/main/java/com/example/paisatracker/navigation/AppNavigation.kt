@@ -29,6 +29,8 @@ import com.example.paisatracker.ui.main.projects.ProjectListScreen
 import com.example.paisatracker.ui.management.ManagementScreen
 import com.example.paisatracker.ui.settings.SettingsScreen
 import com.example.paisatracker.ui.bin.BinScreen
+import com.example.paisatracker.ui.sms.PendingSmsTransactionsScreen
+import com.example.paisatracker.ui.sms.SmsSettingsScreen
 import com.example.paisatracker.viewmodel.AnalyticsViewModel
 import com.example.paisatracker.viewmodel.AnalyticsViewModelFactory
 
@@ -143,6 +145,16 @@ fun AppNavigation(
         composable("management") {
             ManagementScreen(
                 viewModel = viewModel,
+                navController = navController
+            )
+        }
+        composable("pending_sms") {
+            PendingSmsTransactionsScreen(
+                navController = navController
+            )
+        }
+        composable("sms_settings") {
+            SmsSettingsScreen(
                 navController = navController
             )
         }
