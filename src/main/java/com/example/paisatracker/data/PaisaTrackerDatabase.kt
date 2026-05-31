@@ -20,8 +20,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BankAccount::class,
         BankNotificationEntity::class,
         UnrecognizedSmsEntity::class,
+        MerchantRuleEntity::class,
     ],
-    version = 16,
+    version = 18,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,6 +39,7 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
     abstract fun bankAccountDao(): BankAccountDao
     abstract fun bankNotificationDao(): BankNotificationDao
     abstract fun unrecognizedSmsDao(): UnrecognizedSmsDao
+    abstract fun merchantRuleDao(): MerchantRuleDao
     companion object {
         @Volatile
         private var INSTANCE: PaisaTrackerDatabase? = null
@@ -63,7 +65,9 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
-                        MIGRATION_15_16
+                        MIGRATION_15_16,
+                        MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .fallbackToDestructiveMigration(true)  // Temporarily enabled to fix migration issue
                     .build()
@@ -135,6 +139,52 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                     UPDATE bank_notifications
                     SET status = 'AUTO_CREATED'
                     WHERE transaction_id IS NOT NULL
+                """)
+            }
+        }
+        
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add trash-related columns to bank_notifications table
+                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN rejected_at TEXT")
+                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN deletion_scheduled_at TEXT")
+                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN trash_retention_days INTEGER")
+                
+                // Create index on deletion_scheduled_at for efficient cleanup queries
+                db.execSQL("""
+                    CREATE INDEX IF NOT EXISTS `index_bank_notifications_deletion_scheduled_at`
+                    ON `bank_notifications` (`deletion_scheduled_at`)
+                """)
+            }
+        }
+
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create merchant_rules table for auto-categorization
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `merchant_rules` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `merchant_pattern` TEXT NOT NULL,
+                        `category_id` INTEGER NOT NULL,
+                        `project_id` INTEGER,
+                        `priority` INTEGER NOT NULL DEFAULT 0,
+                        `is_active` INTEGER NOT NULL DEFAULT 1,
+                        `match_count` INTEGER NOT NULL DEFAULT 0,
+                        `last_matched_at` TEXT,
+                        `created_at` TEXT NOT NULL
+                    )
+                """)
+                
+                // Create unique index on merchant_pattern
+                db.execSQL("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS `index_merchant_rules_merchant_pattern`
+                    ON `merchant_rules` (`merchant_pattern`)
+                """)
+                
+                // Create index on priority for efficient sorting
+                db.execSQL("""
+                    CREATE INDEX IF NOT EXISTS `index_merchant_rules_priority`
+                    ON `merchant_rules` (`priority`)
                 """)
             }
         }

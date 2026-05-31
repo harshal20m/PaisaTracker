@@ -23,6 +23,10 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
     private val categoryDao: CategoryDao = database.categoryDao()
     private val projectDao: ProjectDao = database.projectDao()
     private val smsPreferences = SmsPreferences(application)
+    private val merchantRuleRepository = com.example.paisatracker.data.MerchantRuleRepository(
+        database.merchantRuleDao(),
+        application.applicationContext
+    )
     
     private val smsTransactionProcessor = SmsTransactionProcessor(
         context = application,
@@ -30,7 +34,8 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
         categoryDao = categoryDao,
         bankNotificationRepository = bankNotificationRepository,
         unrecognizedSmsRepository = com.example.paisatracker.data.UnrecognizedSmsRepository(database.unrecognizedSmsDao()),
-        smsPreferences = smsPreferences
+        smsPreferences = smsPreferences,
+        merchantRuleRepository = merchantRuleRepository
     )
 
     // Pending transactions
@@ -105,7 +110,7 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
-     * Reject a pending transaction
+     * Reject a pending transaction and move to trash
      */
     fun rejectTransaction(notificationId: Long) {
         viewModelScope.launch {
@@ -114,12 +119,35 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
             try {
                 val result = smsTransactionProcessor.rejectPendingTransaction(notificationId)
                 if (result.success) {
-                    _successMessage.value = "Transaction rejected"
+                    val retentionDays = smsPreferences.getTrashRetentionDays()
+                    _successMessage.value = "Transaction moved to trash (auto-deletes in $retentionDays days)"
                 } else {
                     _errorMessage.value = result.reason ?: "Failed to reject transaction"
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Error rejecting transaction: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Restore a transaction from trash
+     */
+    fun restoreTransaction(notificationId: Long) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val result = smsTransactionProcessor.restoreTransaction(notificationId)
+                if (result.success) {
+                    _successMessage.value = "Transaction restored to pending"
+                } else {
+                    _errorMessage.value = result.reason ?: "Failed to restore transaction"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error restoring transaction: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

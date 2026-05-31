@@ -886,7 +886,8 @@ class PaisaTrackerViewModel(
 
     fun getExpensesByBankAccount(bankAccountId: Long): Flow<List<RecentExpense>> {
         return repository.getExpensesByBankAccount(bankAccountId)
-    }
+
+}
 }
 class PaisaTrackerViewModelFactory(
     private val repository: PaisaTrackerRepository,

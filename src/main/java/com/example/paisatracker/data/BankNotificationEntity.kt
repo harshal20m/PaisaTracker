@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 enum class SmsTransactionStatus {
     PENDING,    // Waiting for user confirmation
     CONFIRMED,  // User confirmed and expense created
-    REJECTED,   // User rejected the transaction
+    REJECTED,   // User rejected - moved to trash
     AUTO_CREATED // Automatically created (when auto-mode is ON)
 }
 
@@ -17,7 +17,8 @@ enum class SmsTransactionStatus {
     tableName = "bank_notifications",
     indices = [
         Index(value = ["package_name", "message_hash"], unique = true),
-        Index(value = ["status"])
+        Index(value = ["status"]),
+        Index(value = ["deletion_scheduled_at"])
     ]
 )
 data class BankNotificationEntity(
@@ -63,7 +64,17 @@ data class BankNotificationEntity(
     val bankName: String? = null,
 
     @ColumnInfo(name = "account_last4")
-    val accountLast4: String? = null
+    val accountLast4: String? = null,
+
+    // Trash-related fields
+    @ColumnInfo(name = "rejected_at")
+    val rejectedAt: LocalDateTime? = null,
+
+    @ColumnInfo(name = "deletion_scheduled_at")
+    val deletionScheduledAt: LocalDateTime? = null,
+
+    @ColumnInfo(name = "trash_retention_days")
+    val trashRetentionDays: Int? = null
 )
 
 // Made with Bob

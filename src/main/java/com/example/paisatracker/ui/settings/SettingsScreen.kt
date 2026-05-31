@@ -175,6 +175,15 @@ fun SettingsScreen(
 
             item {
                 MasonryCard(
+                    icon     = Icons.Default.RestoreFromTrash,
+                    title    = "SMS Trash",
+                    subtitle = "Rejected transactions",
+                    onClick  = { navController.navigate("sms_trash") }
+                )
+            }
+
+            item {
+                MasonryCard(
                     icon     = Icons.Default.Settings,
                     title    = "SMS Settings",
                     subtitle = "Auto-create & notifications",

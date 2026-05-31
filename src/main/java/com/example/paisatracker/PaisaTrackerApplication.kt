@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.paisatracker.data.CurrencyPreferencesRepository
+import com.example.paisatracker.data.MerchantRuleRepository
 import com.example.paisatracker.data.PaisaTrackerDatabase
 import com.example.paisatracker.data.PaisaTrackerRepository
 import com.example.paisatracker.data.ThemePreferencesRepository
@@ -51,6 +52,24 @@ class PaisaTrackerApplication : Application() {
         CoroutineScope(Dispatchers.IO).launch {
             currencyPreferencesRepository.selectedCurrency.collect { currency ->
                 CurrentCurrency.set(currency)
+            }
+        }
+        
+        // Seed default merchant rules on first app launch
+        seedDefaultMerchantRules()
+    }
+    
+    private fun seedDefaultMerchantRules() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val merchantRuleRepository = MerchantRuleRepository(
+                    database.merchantRuleDao(),
+                    applicationContext
+                )
+                merchantRuleRepository.seedDefaultRulesIfNeeded(database.categoryDao())
+            } catch (e: Exception) {
+                // Silently fail - not critical for app functionality
+                e.printStackTrace()
             }
         }
     }

@@ -65,6 +65,50 @@ class BankNotificationRepository(
     fun getPendingCount(): Flow<Int> =
         dao.getPendingCount()
 
+    // Trash-related methods
+    fun getTrashedTransactions(): Flow<List<BankNotificationEntity>> =
+        dao.getTrashedTransactions()
+
+    suspend fun getTrashedTransactionsList(): List<BankNotificationEntity> =
+        dao.getTrashedTransactionsList()
+
+    fun getTrashedCount(): Flow<Int> =
+        dao.getTrashedCount()
+
+    suspend fun moveToTrash(
+        id: Long,
+        retentionDays: Int
+    ) {
+        val now = LocalDateTime.now()
+        val deletionDate = now.plusDays(retentionDays.toLong())
+        
+        dao.moveToTrash(
+            id = id,
+            status = SmsTransactionStatus.REJECTED,
+            rejectedAt = now,
+            deletionScheduledAt = deletionDate,
+            retentionDays = retentionDays
+        )
+    }
+
+    suspend fun restoreTransaction(id: Long) {
+        dao.restoreTransaction(id)
+    }
+
+    suspend fun emptyTrash(): Int {
+        return dao.emptyTrash()
+    }
+
+    suspend fun deleteExpiredTransactions(): Int {
+        val now = LocalDateTime.now()
+        return dao.deleteExpiredTransactions(now)
+    }
+
+    suspend fun getExpiredTrashedTransactions(): List<BankNotificationEntity> {
+        val now = LocalDateTime.now()
+        return dao.getExpiredTrashedTransactions(now)
+    }
+
     private fun hash(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray())

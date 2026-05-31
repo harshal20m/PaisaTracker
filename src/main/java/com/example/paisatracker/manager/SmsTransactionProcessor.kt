@@ -30,7 +30,8 @@ class SmsTransactionProcessor(
     private val categoryDao: CategoryDao,
     private val bankNotificationRepository: BankNotificationRepository,
     private val unrecognizedSmsRepository: UnrecognizedSmsRepository,
-    private val smsPreferences: SmsPreferences
+    private val smsPreferences: SmsPreferences,
+    private val merchantRuleRepository: com.example.paisatracker.data.MerchantRuleRepository
 ) {
     companion object {
         private const val TAG = "SmsTransactionProcessor"
@@ -180,6 +181,7 @@ class SmsTransactionProcessor(
 
     /**
      * Creates an expense from a parsed transaction
+     * Now supports merchant rules for automatic categorization
      */
     private suspend fun createExpenseFromTransaction(
         parsedTransaction: ParsedTransaction,
@@ -188,9 +190,36 @@ class SmsTransactionProcessor(
         status: SmsTransactionStatus
     ): ProcessingResult {
         return try {
-            // Get or create category based on merchant name
-            val categoryName = parsedTransaction.merchant ?: "Other"
-            val category = getOrCreateCategory(categoryName)
+            // Check if merchant rules are enabled
+            val useMerchantRules = smsPreferences.getUseMerchantRules()
+            
+            var categoryId: Long? = null
+            var projectId: Long? = null
+            
+            // Try to find matching merchant rule if enabled
+            if (useMerchantRules) {
+                val matchingRule = merchantRuleRepository.findMatchingRule(parsedTransaction.merchant)
+                if (matchingRule != null) {
+                    categoryId = matchingRule.categoryId
+                    projectId = matchingRule.projectId
+                    // Increment match count for this rule
+                    merchantRuleRepository.incrementMatchCount(matchingRule.id)
+                    Log.d(TAG, "Applied merchant rule: ${matchingRule.merchantPattern} -> Category ID: $categoryId")
+                }
+            }
+            
+            // If no rule matched, use default category/project from settings
+            if (categoryId == null) {
+                categoryId = smsPreferences.getDefaultCategoryId()
+                projectId = smsPreferences.getDefaultProjectId()
+            }
+            
+            // If still no category, get or create one based on merchant name
+            val category = if (categoryId != null && categoryId != 0L) {
+                categoryDao.getCategoryByIdSync(categoryId) ?: getOrCreateCategory(parsedTransaction.merchant)
+            } else {
+                getOrCreateCategory(parsedTransaction.merchant)
+            }
             
             // Create expense
             val expense = Expense(
@@ -390,7 +419,7 @@ class SmsTransactionProcessor(
     }
 
     /**
-     * Rejects a pending transaction
+     * Rejects a pending transaction and moves it to trash
      * @param notificationId ID of the pending notification
      */
     suspend fun rejectPendingTransaction(notificationId: Long): ProcessingResult {
@@ -402,17 +431,43 @@ class SmsTransactionProcessor(
                 return ProcessingResult(false, reason = "Transaction is not pending")
             }
 
-            // Update notification status to rejected
-            val updatedNotification = notification.copy(
-                status = SmsTransactionStatus.REJECTED,
-                processed = true
-            )
-            bankNotificationRepository.update(updatedNotification)
+            // Get trash retention days from preferences
+            val retentionDays = smsPreferences.getTrashRetentionDays()
 
-            Log.d(TAG, "Rejected pending transaction $notificationId")
+            // Move to trash with retention period
+            bankNotificationRepository.moveToTrash(
+                id = notificationId,
+                retentionDays = retentionDays
+            )
+
+            Log.d(TAG, "Moved transaction $notificationId to trash (retention: $retentionDays days)")
             return ProcessingResult(true)
         } catch (e: Exception) {
             Log.e(TAG, "Error rejecting transaction: ${e.message}", e)
+            return ProcessingResult(false, reason = e.message)
+        }
+    }
+
+    /**
+     * Restores a transaction from trash back to pending
+     * @param notificationId ID of the trashed notification
+     */
+    suspend fun restoreTransaction(notificationId: Long): ProcessingResult {
+        return try {
+            val notification = bankNotificationRepository.getById(notificationId)
+                ?: return ProcessingResult(false, reason = "Notification not found")
+
+            if (notification.status != SmsTransactionStatus.REJECTED) {
+                return ProcessingResult(false, reason = "Transaction is not in trash")
+            }
+
+            // Restore to pending status
+            bankNotificationRepository.restoreTransaction(notificationId)
+
+            Log.d(TAG, "Restored transaction $notificationId from trash")
+            return ProcessingResult(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error restoring transaction: ${e.message}", e)
             return ProcessingResult(false, reason = e.message)
         }
     }

@@ -1,7 +1,10 @@
 package com.example.paisatracker.ui.sms
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,211 +12,238 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.paisatracker.ui.common.ScreenHeader
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsSettingsScreen(
-    navController: NavHostController,
-    viewModel: SmsTransactionViewModel = viewModel()
+    navController : NavHostController,
+    viewModel     : SmsTransactionViewModel = viewModel()
 ) {
-    val autoCreateExpenses by viewModel.autoCreateExpenses.collectAsStateWithLifecycle(initialValue = false)
-    val showNotifications by viewModel.showNotifications.collectAsStateWithLifecycle(initialValue = true)
-    val vibrateOnDetection by viewModel.vibrateOnDetection.collectAsStateWithLifecycle(initialValue = false)
+    val autoCreate   by viewModel.autoCreateExpenses.collectAsStateWithLifecycle(initialValue = false)
+    val showNotifs   by viewModel.showNotifications.collectAsStateWithLifecycle(initialValue = true)
+    val vibrate      by viewModel.vibrateOnDetection.collectAsStateWithLifecycle(initialValue = false)
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle(initialValue = 0)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        ScreenHeader(
-            title = "SMS Transaction Settings",
-            subtitle = "Configure automatic expense detection",
-            icon = Icons.Default.Settings,
-            onBackClick = { navController.popBackStack() }
-        )
+        SettingsHeader(onBackClick = { navController.popBackStack() })
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Info Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                )
+            // Info banner
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(20.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text       = "SMS Detection Active",
+                        fontSize   = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text       = "PaisaTracker reads bank SMSes, extracts amounts & merchants, and creates expenses automatically or queues them for review.",
+                        fontSize   = 12.sp,
+                        color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+
+            // Pending alert (only when there are pending transactions)
+            if (pendingCount > 0) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "SMS Transaction Detection",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "PaisaTracker automatically detects bank transaction SMS and can create expenses for you.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Pending Transactions Card
-            if (pendingCount > 0) {
-                Card(
-                    onClick = { navController.navigate("pending_sms") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                    )
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f))
+                        .clickable { navController.navigate("pending_sms") }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Column {
-                                Text(
-                                    text = "$pendingCount Pending Transaction${if (pendingCount != 1) "s" else ""}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Tap to review",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
                         Icon(
-                            Icons.Default.ChevronRight,
+                            Icons.Default.Notifications,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint               = MaterialTheme.colorScheme.error,
+                            modifier           = Modifier.size(22.dp)
                         )
+                        Column {
+                            Text(
+                                text       = "$pendingCount Pending Transaction${if (pendingCount != 1) "s" else ""}",
+                                fontSize   = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color      = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text     = "Tap to review now",
+                                fontSize = 11.sp,
+                                color    = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier           = Modifier.size(20.dp)
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            // Settings Section
-            Text(
-                text = "Automation",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            // Automation section
+            SectionLabel("Automation")
+            SettingsGroup {
+                SettingToggleRow(
+                    icon        = Icons.Default.AutoAwesome,
+                    title       = "Auto-Create Expenses",
+                    description = if (autoCreate)
+                        "Expenses are created automatically from SMS"
+                    else
+                        "Review and confirm each transaction manually",
+                    checked     = autoCreate,
+                    onChecked   = { viewModel.setAutoCreateExpenses(it) }
+                )
+            }
 
-            SettingItem(
-                icon = Icons.Default.AutoAwesome,
-                title = "Auto-Create Expenses",
-                description = if (autoCreateExpenses) 
-                    "Expenses are created automatically from SMS" 
-                else 
-                    "Review and confirm each transaction manually",
-                checked = autoCreateExpenses,
-                onCheckedChange = { viewModel.setAutoCreateExpenses(it) }
-            )
+            // Auto-Create Configuration section (only show when auto-create is enabled)
+            if (autoCreate) {
+                SectionLabel("Auto-Create Configuration")
+                SettingsGroup {
+                    SettingNavigationRow(
+                        icon        = Icons.Default.Settings,
+                        title       = "Default Category & Project",
+                        description = "Configure defaults for auto-created expenses",
+                        onClick     = { navController.navigate("auto_create_config") }
+                    )
+                    HorizontalDivider(
+                        modifier  = Modifier.padding(horizontal = 16.dp),
+                        color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        thickness = 0.5.dp
+                    )
+                    SettingNavigationRow(
+                        icon        = Icons.Default.Rule,
+                        title       = "Merchant Rules",
+                        description = "Set category rules for specific merchants",
+                        onClick     = { navController.navigate("merchant_rules") }
+                    )
+                }
+            }
 
-            HorizontalDivider()
+            // Notifications section
+            SectionLabel("Notifications")
+            SettingsGroup {
+                SettingToggleRow(
+                    icon        = Icons.Default.Notifications,
+                    title       = "Show Notifications",
+                    description = "Alert when transactions are detected",
+                    checked     = showNotifs,
+                    onChecked   = { viewModel.setShowNotifications(it) }
+                )
+                HorizontalDivider(
+                    modifier  = Modifier.padding(horizontal = 16.dp),
+                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    thickness = 0.5.dp
+                )
+                SettingToggleRow(
+                    icon        = Icons.Default.Vibration,
+                    title       = "Vibrate on Detection",
+                    description = "Haptic feedback on new transaction SMS",
+                    checked     = vibrate,
+                    onChecked   = { viewModel.setVibrateOnDetection(it) }
+                )
+            }
 
-            Text(
-                text = "Notifications",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            SettingItem(
-                icon = Icons.Default.Notifications,
-                title = "Show Notifications",
-                description = "Get notified when transactions are detected",
-                checked = showNotifications,
-                onCheckedChange = { viewModel.setShowNotifications(it) }
-            )
-
-            SettingItem(
-                icon = Icons.Default.Vibration,
-                title = "Vibrate on Detection",
-                description = "Vibrate when a transaction SMS is detected",
-                checked = vibrateOnDetection,
-                onCheckedChange = { viewModel.setVibrateOnDetection(it) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Help Card
+            // How it works card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
+                shape    = RoundedCornerShape(16.dp),
+                colors   = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier            = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
                             Icons.Default.Help,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint               = MaterialTheme.colorScheme.primary,
+                            modifier           = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "How it works",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text       = "How it works",
+                            fontSize   = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    
-                    Text(
-                        text = "• PaisaTracker reads bank transaction SMS\n" +
-                               "• Extracts amount, merchant, and bank details\n" +
-                               "• Creates expenses automatically or saves for review\n" +
-                               "• Supports 50+ banks across multiple countries",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+
+                    listOf(
+                        "Reads bank transaction SMS in real time",
+                        "Extracts amount, merchant, and bank details",
+                        "Creates expenses automatically or queues for review",
+                        "Supports 50+ banks across multiple countries"
+                    ).forEach { step ->
+                        Row(
+                            verticalAlignment     = Alignment.Top,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 6.dp)
+                                    .size(5.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                            Text(
+                                text       = step,
+                                fontSize   = 12.sp,
+                                color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -221,50 +251,193 @@ fun SmsSettingsScreen(
 }
 
 @Composable
-private fun SettingItem(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    description: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
+private fun SettingsHeader(onBackClick: () -> Unit) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        IconButton(
+            onClick  = onBackClick,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
             Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier           = Modifier.size(18.dp)
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text          = "CONFIGURE",
+            fontSize      = 11.sp,
+            fontWeight    = FontWeight.SemiBold,
+            letterSpacing = 1.6.sp,
+            color         = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text       = "SMS Settings",
+            fontSize   = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color      = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+            text     = "Auto expense detection",
+            fontSize = 13.sp,
+            color    = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-// Made with Bob
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text          = text.uppercase(),
+        fontSize      = 11.sp,
+        fontWeight    = FontWeight.SemiBold,
+        letterSpacing = 1.2.sp,
+        color         = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    )
+}
+
+@Composable
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+private fun SettingToggleRow(
+    icon        : ImageVector,
+    title       : String,
+    description : String,
+    checked     : Boolean,
+    onChecked   : (Boolean) -> Unit
+) {
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier              = Modifier.weight(1f),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text       = title,
+                    fontSize   = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color      = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text       = description,
+                    fontSize   = 11.sp,
+                    color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(
+            checked         = checked,
+            onCheckedChange = onChecked,
+            colors          = SwitchDefaults.colors(
+                checkedThumbColor    = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor    = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor  = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor  = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+            )
+        )
+    }
+}
+
+@Composable
+private fun SettingNavigationRow(
+    icon        : ImageVector,
+    title       : String,
+    description : String,
+    onClick     : () -> Unit
+) {
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier              = Modifier.weight(1f),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text       = title,
+                    fontSize   = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color      = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text       = description,
+                    fontSize   = 11.sp,
+                    color      = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier           = Modifier.size(20.dp)
+        )
+    }
+}

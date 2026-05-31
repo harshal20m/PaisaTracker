@@ -69,6 +69,10 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
         val database = PaisaTrackerDatabase.getDatabase(context)
         val bankNotificationRepo = BankNotificationRepository(database.bankNotificationDao())
         val unrecognizedSmsRepo = UnrecognizedSmsRepository(database.unrecognizedSmsDao())
+        val merchantRuleRepo = com.example.paisatracker.data.MerchantRuleRepository(
+            database.merchantRuleDao(),
+            context
+        )
         val smsPreferences = SmsPreferences(context)
         
         val processor = SmsTransactionProcessor(
@@ -77,7 +81,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             categoryDao = database.categoryDao(),
             bankNotificationRepository = bankNotificationRepo,
             unrecognizedSmsRepository = unrecognizedSmsRepo,
-            smsPreferences = smsPreferences
+            smsPreferences = smsPreferences,
+            merchantRuleRepository = merchantRuleRepo
         )
 
         // Process each unique SMS

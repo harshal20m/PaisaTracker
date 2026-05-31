@@ -28,9 +28,14 @@ import com.example.paisatracker.ui.main.home.HomeScreen
 import com.example.paisatracker.ui.main.projects.ProjectListScreen
 import com.example.paisatracker.ui.management.ManagementScreen
 import com.example.paisatracker.ui.settings.SettingsScreen
+import com.example.paisatracker.ui.sms.AutoCreateConfigScreen
 import com.example.paisatracker.ui.bin.BinScreen
+import com.example.paisatracker.ui.sms.MerchantRulesScreen
+import com.example.paisatracker.ui.sms.MerchantRuleViewModel
 import com.example.paisatracker.ui.sms.PendingSmsTransactionsScreen
 import com.example.paisatracker.ui.sms.SmsSettingsScreen
+import com.example.paisatracker.ui.trash.TrashScreen
+import com.example.paisatracker.ui.trash.TrashViewModel
 import com.example.paisatracker.viewmodel.AnalyticsViewModel
 import com.example.paisatracker.viewmodel.AnalyticsViewModelFactory
 
@@ -153,9 +158,36 @@ fun AppNavigation(
                 navController = navController
             )
         }
+        composable("sms_trash") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val trashViewModel = TrashViewModel(application)
+            TrashScreen(
+                viewModel = trashViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
         composable("sms_settings") {
             SmsSettingsScreen(
                 navController = navController
+            )
+        }
+        composable("auto_create_config") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application)
+            AutoCreateConfigScreen(
+                navController = navController,
+                smsViewModel = smsViewModel
+            )
+        }
+        composable("merchant_rules") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val merchantRuleViewModel = MerchantRuleViewModel(application)
+            MerchantRulesScreen(
+                navController = navController,
+                viewModel = merchantRuleViewModel
             )
         }
     }

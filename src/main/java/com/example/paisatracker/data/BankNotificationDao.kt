@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDateTime
 
 @Dao
 interface BankNotificationDao {
@@ -59,6 +60,59 @@ interface BankNotificationDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplace(notification: BankNotificationEntity): Long
+
+    // Trash-related methods
+    @Query("SELECT * FROM bank_notifications WHERE status = 'REJECTED' ORDER BY rejected_at DESC")
+    fun getTrashedTransactions(): Flow<List<BankNotificationEntity>>
+
+    @Query("SELECT * FROM bank_notifications WHERE status = 'REJECTED' ORDER BY rejected_at DESC")
+    suspend fun getTrashedTransactionsList(): List<BankNotificationEntity>
+
+    @Query("SELECT COUNT(*) FROM bank_notifications WHERE status = 'REJECTED'")
+    fun getTrashedCount(): Flow<Int>
+
+    @Query("""
+        SELECT * FROM bank_notifications
+        WHERE status = 'REJECTED'
+        AND deletion_scheduled_at <= :currentTime
+    """)
+    suspend fun getExpiredTrashedTransactions(currentTime: LocalDateTime): List<BankNotificationEntity>
+
+    @Query("""
+        UPDATE bank_notifications
+        SET status = 'PENDING',
+            rejected_at = NULL,
+            deletion_scheduled_at = NULL,
+            trash_retention_days = NULL
+        WHERE id = :id
+    """)
+    suspend fun restoreTransaction(id: Long)
+
+    @Query("DELETE FROM bank_notifications WHERE status = 'REJECTED'")
+    suspend fun emptyTrash(): Int
+
+    @Query("""
+        DELETE FROM bank_notifications
+        WHERE status = 'REJECTED'
+        AND deletion_scheduled_at <= :currentTime
+    """)
+    suspend fun deleteExpiredTransactions(currentTime: LocalDateTime): Int
+
+    @Query("""
+        UPDATE bank_notifications
+        SET status = :status,
+            rejected_at = :rejectedAt,
+            deletion_scheduled_at = :deletionScheduledAt,
+            trash_retention_days = :retentionDays
+        WHERE id = :id
+    """)
+    suspend fun moveToTrash(
+        id: Long,
+        status: SmsTransactionStatus,
+        rejectedAt: LocalDateTime,
+        deletionScheduledAt: LocalDateTime,
+        retentionDays: Int
+    )
 }
 
 // Made with Bob

@@ -47,6 +47,8 @@ import com.example.paisatracker.ui.settings.UpdateRow
 import com.example.paisatracker.ui.bin.BinSheetContent
 import com.example.paisatracker.ui.sms.PendingSmsCompactCard
 import com.example.paisatracker.ui.sms.SmsTransactionViewModel
+import com.example.paisatracker.ui.trash.TrashScreen
+import com.example.paisatracker.ui.trash.TrashViewModel
 import com.example.paisatracker.data.Project
 import com.example.paisatracker.util.CurrentCurrency
 import com.example.paisatracker.viewmodel.AnalyticsViewModel
@@ -69,6 +71,12 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     val smsViewModel = remember {
         SmsTransactionViewModel(application)
     }
+    
+    // ── SMS Trash ─────────────────────────────────────────────────────────────
+    val trashViewModel = remember {
+        TrashViewModel(application)
+    }
+    val trashCount by trashViewModel.trashedTransactions.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // ── Analytics ─────────────────────────────────────────────────────────────
     val analyticsViewModel = remember { AnalyticsViewModel(application.repository) }
@@ -100,11 +108,13 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     var showAssetsSheet by remember { mutableStateOf(false) }
     var showQuickAdd by remember { mutableStateOf(false) }
     var showBin by remember { mutableStateOf(false) }
+    var showSmsTrash by remember { mutableStateOf(false) }
     var showDataManagement by remember { mutableStateOf(false) }
     var showSearchSheet by remember { mutableStateOf(false) }
     var showSummarySheet by remember { mutableStateOf(false) }
     val quickAddState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val binSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val smsTrashSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val searchSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val summarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -262,7 +272,12 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                             onBinClick = {
                                 showBin = true
                                 scope.launch { binSheetState.show() }
-                            }
+                            },
+                            onSmsTrashClick = {
+                                showSmsTrash = true
+                                scope.launch { smsTrashSheetState.show() }
+                            },
+                            smsTrashCount = trashCount.size
                         )
 
                         // Analytics Preview Card
@@ -343,6 +358,23 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
             )
         }
     }
+    
+    if (showSmsTrash) {
+        ModalBottomSheet(
+            onDismissRequest = { showSmsTrash = false },
+            sheetState = smsTrashSheetState,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle() },
+            modifier = Modifier.fillMaxHeight()
+        ) {
+            TrashScreen(
+                viewModel = trashViewModel,
+                onNavigateBack = {
+                    scope.launch { smsTrashSheetState.hide() }.invokeOnCompletion { showSmsTrash = false }
+                }
+            )
+        }
+    }
 
     if (showSearchSheet) {
         ModalBottomSheet(
@@ -390,7 +422,9 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
 private fun HomeActionGrid(
     onSummaryClick: () -> Unit,
     onAssetsClick: () -> Unit,
-    onBinClick: () -> Unit
+    onBinClick: () -> Unit,
+    onSmsTrashClick: () -> Unit,
+    smsTrashCount: Int = 0
 ) {
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -408,7 +442,7 @@ private fun HomeActionGrid(
                 onClick = onSummaryClick,
                 modifier = Modifier
                     .weight(1f)
-                    .height(116.dp),
+                    .height(169.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.outlinedCardColors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
@@ -444,7 +478,7 @@ private fun HomeActionGrid(
                 }
             }
             
-            // Gallery and Bin - Stacked on right
+            // Gallery, Bin, and SMS Trash - Stacked on right
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -532,6 +566,74 @@ private fun HomeActionGrid(
                         }
                         Text(
                             "Bin",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                
+                // SMS Trash
+                OutlinedCard(
+                    onClick = onSmsTrashClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(53.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.RestoreFromTrash,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+                            // Badge
+                            if (smsTrashCount > 0) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-4).dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = if (smsTrashCount > 9) "9+" else smsTrashCount.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onError,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            "SMS Trash",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
