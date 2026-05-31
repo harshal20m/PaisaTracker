@@ -72,6 +72,9 @@ interface ProjectDao {
     @Query("SELECT * FROM projects WHERE id = :projectId")
     fun getProjectById(projectId: Long): Flow<Project>
 
+    @Query("SELECT * FROM projects WHERE id = :projectId LIMIT 1")
+    suspend fun getProjectByIdSync(projectId: Long): Project?
+
     @Query("SELECT * FROM projects WHERE name = :name LIMIT 1")
     suspend fun getProjectByName(name: String): Project?
 

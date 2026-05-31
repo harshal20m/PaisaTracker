@@ -109,6 +109,18 @@ class BankNotificationRepository(
         return dao.getExpiredTrashedTransactions(now)
     }
 
+    suspend fun getByHash(messageHash: String): BankNotificationEntity? {
+        return dao.getByHash(messageHash)
+    }
+
+    suspend fun resetTransactionLink(expenseId: Long) {
+        dao.resetTransactionLink(expenseId)
+    }
+
+    suspend fun deleteAllNotifications() {
+        dao.deleteAllNotifications()
+    }
+
     private fun hash(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray())

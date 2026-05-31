@@ -574,6 +574,8 @@ fun EditProjectSheetContent(
 fun DeleteProjectSheetContent(
     projectName: String,
     projectEmoji: String,
+    categoryCount: Int = 0,
+    expenseCount: Int = 0,
     onCancel: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -618,18 +620,26 @@ fun DeleteProjectSheetContent(
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.size(44.dp)) {
                     Box(contentAlignment = Alignment.Center) { Text(projectEmoji, fontSize = 22.sp) }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         projectName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Text(
-                        "All categories and expenses will be permanently removed.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (categoryCount > 0 || expenseCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                "⚠️  $categoryCount ${if (categoryCount != 1) "categories" else "category"} and $expenseCount ${if (expenseCount != 1) "expenses" else "expense"} will be deleted",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

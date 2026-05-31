@@ -52,6 +52,20 @@ interface BankNotificationDao {
     @Query("SELECT * FROM bank_notifications WHERE id = :id")
     suspend fun getById(id: Long): BankNotificationEntity?
 
+    @Query("SELECT * FROM bank_notifications WHERE message_hash = :hash LIMIT 1")
+    suspend fun getByHash(hash: String): BankNotificationEntity?
+
+    @Query("SELECT * FROM bank_notifications WHERE transaction_id = :expenseId LIMIT 1")
+    suspend fun getByTransactionId(expenseId: Long): BankNotificationEntity?
+
+    @Query("""
+        UPDATE bank_notifications
+        SET transaction_id = NULL,
+            status = 'PENDING'
+        WHERE transaction_id = :expenseId
+    """)
+    suspend fun resetTransactionLink(expenseId: Long)
+
     @Query("DELETE FROM bank_notifications WHERE id = :id")
     suspend fun deleteById(id: Long)
 

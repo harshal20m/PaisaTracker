@@ -1,9 +1,13 @@
 package com.example.paisatracker.ui.sms
 
+import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -14,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -22,7 +27,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.paisatracker.data.BankNotificationEntity
+import com.example.paisatracker.data.Category
+import com.example.paisatracker.data.Project
 import com.example.paisatracker.ui.components.EmptyState
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -47,6 +55,12 @@ fun PendingSmsTransactionsScreen(
 
     var selectedTransaction   by remember { mutableStateOf<BankNotificationEntity?>(null) }
     var showConfirmationSheet by remember { mutableStateOf(false) }
+    
+    // Bulk selection state
+    var isSelectionMode by remember { mutableStateOf(false) }
+    var selectedTransactionIds by remember { mutableStateOf(setOf<Long>()) }
+    var showBulkConfirmSheet by remember { mutableStateOf(false) }
+    
     val snackbarHostState     = remember { SnackbarHostState() }
 
     LaunchedEffect(errorMessage) {
@@ -73,7 +87,27 @@ fun PendingSmsTransactionsScreen(
         ) {
             PendingScreenHeader(
                 count       = pendingTransactions.size,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    if (isSelectionMode) {
+                        isSelectionMode = false
+                        selectedTransactionIds = setOf()
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                isSelectionMode = isSelectionMode,
+                selectedCount = selectedTransactionIds.size,
+                onToggleSelectionMode = {
+                    isSelectionMode = !isSelectionMode
+                    if (!isSelectionMode) {
+                        selectedTransactionIds = setOf()
+                    }
+                },
+                onBulkConfirm = {
+                    if (selectedTransactionIds.isNotEmpty()) {
+                        showBulkConfirmSheet = true
+                    }
+                }
             )
 
             when {
@@ -95,6 +129,15 @@ fun PendingSmsTransactionsScreen(
                         PendingTransactionCard(
                             transaction  = txn,
                             accentColors = cardAccents[pendingTransactions.indexOf(txn) % cardAccents.size],
+                            isSelectionMode = isSelectionMode,
+                            isSelected = selectedTransactionIds.contains(txn.id),
+                            onSelectionToggle = {
+                                selectedTransactionIds = if (selectedTransactionIds.contains(txn.id)) {
+                                    selectedTransactionIds - txn.id
+                                } else {
+                                    selectedTransactionIds + txn.id
+                                }
+                            },
                             onConfirm    = { selectedTransaction = txn; showConfirmationSheet = true },
                             onReject     = { viewModel.rejectTransaction(txn.id) }
                         )
@@ -118,78 +161,179 @@ fun PendingSmsTransactionsScreen(
                 )
                 showConfirmationSheet = false
                 selectedTransaction   = null
-            }
+            },
+            navController = navController
+        )
+    }
+    
+    // Bulk confirmation sheet
+    if (showBulkConfirmSheet) {
+        BulkConfirmationSheet(
+            transactionCount = selectedTransactionIds.size,
+            viewModel = viewModel,
+            onDismiss = { showBulkConfirmSheet = false },
+            onConfirm = { categoryId, projectId ->
+                viewModel.bulkConfirmTransactions(
+                    notificationIds = selectedTransactionIds.toList(),
+                    categoryId = categoryId,
+                    projectId = projectId
+                )
+                showBulkConfirmSheet = false
+                isSelectionMode = false
+                selectedTransactionIds = setOf()
+            },
+            navController = navController
         )
     }
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
 @Composable
-private fun PendingScreenHeader(count: Int, onBackClick: () -> Unit) {
+private fun PendingScreenHeader(
+    count: Int,
+    onBackClick: () -> Unit,
+    isSelectionMode: Boolean,
+    selectedCount: Int,
+    onToggleSelectionMode: () -> Unit,
+    onBulkConfirm: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 20.dp, vertical = 20.dp)
     ) {
-        IconButton(
-            onClick  = onBackClick,
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.ArrowBack,
-                contentDescription = "Back",
-                tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier           = Modifier.size(18.dp)
-            )
+            IconButton(
+                onClick  = onBackClick,
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Icon(
+                    if (isSelectionMode) Icons.Default.Close else Icons.Default.ArrowBack,
+                    contentDescription = if (isSelectionMode) "Cancel" else "Back",
+                    tint               = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier           = Modifier.size(18.dp)
+                )
+            }
+            
+            if (!isSelectionMode) {
+                IconButton(
+                    onClick  = onToggleSelectionMode,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Select Multiple",
+                        tint               = MaterialTheme.colorScheme.primary,
+                        modifier           = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(16.dp))
 
-        Text(
-            text          = "REVIEW REQUIRED",
-            fontSize      = 11.sp,
-            fontWeight    = FontWeight.SemiBold,
-            letterSpacing = 1.6.sp,
-            color         = MaterialTheme.colorScheme.primary
-        )
-        Spacer(Modifier.height(6.dp))
-
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
+        if (isSelectionMode) {
             Text(
-                text       = "Pending\nTransactions",
-                fontSize   = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color      = MaterialTheme.colorScheme.onBackground,
-                lineHeight = 34.sp
+                text          = "SELECT TRANSACTIONS",
+                fontSize      = 11.sp,
+                fontWeight    = FontWeight.SemiBold,
+                letterSpacing = 1.6.sp,
+                color         = MaterialTheme.colorScheme.primary
             )
-            Surface(
-                shape = RoundedCornerShape(100.dp),
-                color = MaterialTheme.colorScheme.primary
+            Spacer(Modifier.height(6.dp))
+            
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
             ) {
                 Text(
-                    text       = "$count new",
-                    modifier   = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    fontSize   = 13.sp,
+                    text       = "$selectedCount Selected",
+                    fontSize   = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.onPrimary
+                    color      = MaterialTheme.colorScheme.onBackground,
+                    lineHeight = 34.sp
                 )
+                
+                if (selectedCount > 0) {
+                    Button(
+                        onClick = onBulkConfirm,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Confirm", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
-        }
+            
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text     = "Select transactions to confirm together",
+                fontSize = 13.sp,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Text(
+                text          = "REVIEW REQUIRED",
+                fontSize      = 11.sp,
+                fontWeight    = FontWeight.SemiBold,
+                letterSpacing = 1.6.sp,
+                color         = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.height(6.dp))
 
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text     = "$count transaction${if (count != 1) "s" else ""} awaiting your review",
-            fontSize = 13.sp,
-            color    = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text(
+                    text       = "Pending\nTransactions",
+                    fontSize   = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color      = MaterialTheme.colorScheme.onBackground,
+                    lineHeight = 34.sp
+                )
+                Surface(
+                    shape = RoundedCornerShape(100.dp),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text       = "$count new",
+                        modifier   = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                        fontSize   = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text     = "$count transaction${if (count != 1) "s" else ""} awaiting your review",
+                fontSize = 13.sp,
+                color    = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -198,14 +342,29 @@ private fun PendingScreenHeader(count: Int, onBackClick: () -> Unit) {
 fun PendingTransactionCard(
     transaction  : BankNotificationEntity,
     accentColors : List<Color>,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onSelectionToggle: () -> Unit = {},
     onConfirm    : () -> Unit,
     onReject     : () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isSelectionMode) {
+                    Modifier.clickable(onClick = onSelectionToggle)
+                } else {
+                    Modifier
+                }
+            ),
         shape    = RoundedCornerShape(18.dp),
         colors   = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            }
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -218,6 +377,42 @@ fun PendingTransactionCard(
         )
 
         Column(modifier = Modifier.padding(16.dp)) {
+            // Selection mode indicator
+            if (isSelectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .border(
+                                width = 2.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outlineVariant,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            
             // Bank + amount row
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -320,47 +515,49 @@ fun PendingTransactionCard(
                 MetaTag("UPI")
             }
 
-            Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(Modifier.height(14.dp))
+            // Action buttons (only show in normal mode)
+            if (!isSelectionMode) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(Modifier.height(14.dp))
 
-            // Action buttons
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick  = onReject,
-                    modifier = Modifier.weight(1f),
-                    shape    = RoundedCornerShape(10.dp),
-                    colors   = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-                    )
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Reject", fontWeight = FontWeight.Medium)
-                }
+                    OutlinedButton(
+                        onClick  = onReject,
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Reject", fontWeight = FontWeight.Medium)
+                    }
 
-                Button(
-                    onClick  = onConfirm,
-                    modifier = Modifier.weight(2f),
-                    shape    = RoundedCornerShape(10.dp),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint               = MaterialTheme.colorScheme.onPrimary,
-                        modifier           = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("Confirm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick  = onConfirm,
+                        modifier = Modifier.weight(2f),
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint               = MaterialTheme.colorScheme.onPrimary,
+                            modifier           = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Confirm", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -382,5 +579,404 @@ private fun MetaTag(text: String) {
             fontSize = 11.sp,
             color    = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+// ── Bulk Confirmation Sheet ───────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BulkConfirmationSheet(
+    transactionCount: Int,
+    viewModel: SmsTransactionViewModel,
+    onDismiss: () -> Unit,
+    onConfirm: (categoryId: Long?, projectId: Long?) -> Unit,
+    navController: androidx.navigation.NavController
+) {
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val projects by viewModel.projects.collectAsStateWithLifecycle()
+
+    var selectedCategory by remember { mutableStateOf<Category?>(null) }
+    var selectedProject by remember { mutableStateOf<Project?>(null) }
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    var showProjectPicker by remember { mutableStateOf(false) }
+    var isDetecting by remember { mutableStateOf(false) }
+    var showRulesDisabledDialog by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 16.dp)
+                    .size(width = 40.dp, height = 4.dp)
+                    .clip(RoundedCornerShape(100.dp))
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 36.dp)
+        ) {
+            Text(
+                text = "Bulk Confirm Transactions",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Apply category and project to $transactionCount transaction${if (transactionCount != 1) "s" else ""}",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            // Info card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                ),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "All selected transactions will be confirmed with the same category and project",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // Category
+            BulkPickerSectionLabel("Category")
+            Spacer(Modifier.height(8.dp))
+            BulkPickerSelectorCard(
+                icon = Icons.Default.Category,
+                label = selectedCategory?.name ?: "Select Category",
+                emoji = selectedCategory?.emoji,
+                selected = selectedCategory != null,
+                onClick = { showCategoryPicker = true }
+            )
+
+            Spacer(Modifier.height(14.dp))
+
+            // Project
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                BulkPickerSectionLabel("Project")
+                Text(
+                    text = "— optional",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            BulkPickerSelectorCard(
+                icon = Icons.Default.Folder,
+                label = selectedProject?.name ?: "Select Project",
+                emoji = selectedProject?.emoji,
+                selected = selectedProject != null,
+                onClick = { showProjectPicker = true }
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // Actions
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.outlineVariant
+                    )
+                ) {
+                    Text("Cancel")
+                }
+
+                Button(
+                    onClick = { onConfirm(selectedCategory?.id, selectedProject?.id) },
+                    modifier = Modifier.weight(2f),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = selectedCategory != null,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Confirm All",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+
+    // Category picker with detect option
+    if (showCategoryPicker) {
+        BulkPickerDialog(
+            title = "Select Category",
+            items = categories,
+            onDismiss = { showCategoryPicker = false },
+            showDetectOption = false, // No merchant context in bulk mode
+            isDetecting = isDetecting,
+            onDetectClick = {
+                // Not applicable for bulk - would need to check all merchants
+                scope.launch {
+                    val rulesEnabled = viewModel.smsPreferences.getUseMerchantRules()
+                    if (!rulesEnabled) {
+                        showRulesDisabledDialog = true
+                    }
+                }
+            },
+            itemContent = { category ->
+                BulkPickerDialogRow(
+                    emoji = category.emoji,
+                    name = category.name,
+                    selected = selectedCategory?.id == category.id,
+                    onClick = { selectedCategory = category; showCategoryPicker = false }
+                )
+            }
+        )
+    }
+
+    if (showProjectPicker) {
+        BulkPickerDialog(
+            title = "Select Project",
+            items = projects,
+            onDismiss = { showProjectPicker = false },
+            itemContent = { project ->
+                BulkPickerDialogRow(
+                    emoji = project.emoji,
+                    name = project.name,
+                    selected = selectedProject?.id == project.id,
+                    onClick = { selectedProject = project; showProjectPicker = false }
+                )
+            }
+        )
+    }
+
+    // Rules Disabled Dialog
+    if (showRulesDisabledDialog) {
+        AlertDialog(
+            onDismissRequest = { showRulesDisabledDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Merchant Rules Disabled",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Merchant rules are currently disabled. Enable them in SMS Settings to automatically detect categories.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRulesDisabledDialog = false
+                        navController.navigate("sms_settings")
+                        onDismiss()
+                    }
+                ) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRulesDisabledDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BulkPickerSectionLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.2.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    )
+}
+
+@Composable
+private fun BulkPickerSelectorCard(
+    icon: ImageVector,
+    label: String,
+    emoji: String?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (emoji != null) {
+            Text(emoji, fontSize = 26.sp)
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            color = if (selected) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Default.ArrowDropDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> BulkPickerDialog(
+    title: String,
+    items: List<T>,
+    onDismiss: () -> Unit,
+    showDetectOption: Boolean = false,
+    isDetecting: Boolean = false,
+    onDetectClick: () -> Unit = {},
+    itemContent: @Composable (T) -> Unit
+) {
+    AlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(
+                0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    thickness = 0.5.dp
+                )
+
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(items) { item -> itemContent(item) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BulkPickerDialogRow(
+    emoji: String,
+    name: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                else androidx.compose.ui.graphics.Color.Transparent
+            )
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(emoji, fontSize = 24.sp)
+        Text(
+            text = name,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (selected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
     }
 }

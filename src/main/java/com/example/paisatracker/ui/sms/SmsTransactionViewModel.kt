@@ -1,6 +1,7 @@
 package com.example.paisatracker.ui.sms
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.paisatracker.data.BankNotificationEntity
@@ -17,12 +18,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * Result of detecting category/project using merchant rules
+ */
+data class RuleDetectionResult(
+    val category: Category? = null,
+    val project: Project? = null,
+    val ruleMatched: Boolean = false
+)
+
 class SmsTransactionViewModel(application: Application) : AndroidViewModel(application) {
     private val database = PaisaTrackerDatabase.getDatabase(application)
     private val bankNotificationRepository = BankNotificationRepository(database.bankNotificationDao())
     private val categoryDao: CategoryDao = database.categoryDao()
     private val projectDao: ProjectDao = database.projectDao()
-    private val smsPreferences = SmsPreferences(application)
+    val smsPreferences = SmsPreferences(application)
     private val merchantRuleRepository = com.example.paisatracker.data.MerchantRuleRepository(
         database.merchantRuleDao(),
         application.applicationContext
@@ -170,6 +180,65 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
+     * Clear all SMS scan history
+     * Deletes all bank notifications (which will cascade delete associated expenses)
+     */
+    fun clearScanHistory() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                bankNotificationRepository.deleteAllNotifications()
+                _successMessage.value = "Scan history cleared successfully"
+            } catch (e: Exception) {
+                _errorMessage.value = "Error clearing scan history: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Bulk confirm multiple pending transactions with the same category and project
+     */
+    fun bulkConfirmTransactions(
+        notificationIds: List<Long>,
+        categoryId: Long? = null,
+        projectId: Long? = null
+    ) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                var successCount = 0
+                var failCount = 0
+                
+                notificationIds.forEach { notificationId ->
+                    val result = smsTransactionProcessor.confirmPendingTransaction(
+                        notificationId = notificationId,
+                        categoryId = categoryId,
+                        projectId = projectId
+                    )
+                    if (result.success) {
+                        successCount++
+                    } else {
+                        failCount++
+                    }
+                }
+                
+                if (failCount == 0) {
+                    _successMessage.value = "Successfully confirmed $successCount transaction${if (successCount != 1) "s" else ""}"
+                } else {
+                    _successMessage.value = "Confirmed $successCount, failed $failCount transaction${if (failCount != 1) "s" else ""}"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error in bulk confirmation: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
      * Clear messages
      */
     fun clearErrorMessage() {
@@ -178,6 +247,68 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
 
     fun clearSuccessMessage() {
         _successMessage.value = null
+    }
+
+    /**
+     * Detect category and project using merchant rules
+     * Returns the detected category and project if a rule matches
+     */
+    suspend fun detectUsingRules(merchant: String?): RuleDetectionResult {
+        return try {
+            Log.d(TAG, "=== DETECT USING RULES STARTED ===")
+            Log.d(TAG, "Merchant name: $merchant")
+            
+            if (merchant.isNullOrBlank()) {
+                Log.d(TAG, "Merchant is null or blank, returning no match")
+                return RuleDetectionResult(ruleMatched = false)
+            }
+
+            // Check if merchant rules are enabled
+            val useMerchantRules = smsPreferences.getUseMerchantRules()
+            Log.d(TAG, "Merchant rules enabled in preferences: $useMerchantRules")
+            
+            if (!useMerchantRules) {
+                Log.d(TAG, "Merchant rules disabled, returning no match")
+                _errorMessage.value = "Merchant rules are disabled. Enable them in SMS settings."
+                return RuleDetectionResult(ruleMatched = false)
+            }
+
+            // Find matching rule
+            Log.d(TAG, "Searching for matching rule...")
+            val matchingRule = merchantRuleRepository.findMatchingRule(merchant)
+            
+            if (matchingRule != null) {
+                Log.d(TAG, "✓ Found matching rule: ${matchingRule.merchantPattern}")
+                Log.d(TAG, "  Category ID: ${matchingRule.categoryId}")
+                Log.d(TAG, "  Project ID: ${matchingRule.projectId}")
+                
+                val category = categoryDao.getCategoryByIdSync(matchingRule.categoryId)
+                Log.d(TAG, "  Category found: ${category?.name ?: "NULL"}")
+                
+                val project = matchingRule.projectId?.let { projectDao.getProjectByIdSync(it) }
+                Log.d(TAG, "  Project found: ${project?.name ?: "NULL"}")
+                
+                _successMessage.value = "Detected: ${category?.name ?: "Unknown"}"
+                
+                return RuleDetectionResult(
+                    category = category,
+                    project = project,
+                    ruleMatched = true
+                )
+            }
+
+            Log.d(TAG, "✗ No matching rule found for merchant: $merchant")
+            _errorMessage.value = "No rule found for '$merchant'. Create a rule in Merchant Rules."
+            return RuleDetectionResult(ruleMatched = false)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error detecting category: ${e.message}", e)
+            _errorMessage.value = "Error detecting category: ${e.message}"
+            return RuleDetectionResult(ruleMatched = false)
+        }
+    }
+    
+    companion object {
+        private const val TAG = "SmsTransactionViewModel"
     }
 }
 

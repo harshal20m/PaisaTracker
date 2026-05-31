@@ -88,7 +88,7 @@ class SmsTransactionProcessor(
             Log.d(TAG, "Parsed transaction: ${parsedTransaction.amount} from ${parsedTransaction.bankName}")
 
             // Save the transaction as expense
-            return saveParsedTransaction(parsedTransaction, body, timestamp)
+            return saveParsedTransaction(parsedTransaction, sender, body, timestamp)
         } catch (e: Exception) {
             Log.e(TAG, "Error processing SMS", e)
             return ProcessingResult(false, reason = e.message)
@@ -100,16 +100,31 @@ class SmsTransactionProcessor(
      */
     private suspend fun saveParsedTransaction(
         parsedTransaction: ParsedTransaction,
+        sender: String,
         smsBody: String,
         timestamp: Long
     ): ProcessingResult {
         return try {
-            // Check for duplicates using hash
-            val transactionHash = generateTransactionHash(parsedTransaction, timestamp)
-            val existingExpense = expenseDao.getExpenseByHash(transactionHash)
+            // Generate message hash from SMS content (sender + body + timestamp)
+            val messageHash = generateMessageHash(sender, smsBody, timestamp)
+            
+            // Check 1: Check if this SMS was already processed (via bank_notifications)
+            val existingNotification = bankNotificationRepository.getByHash(messageHash)
+            if (existingNotification != null) {
+                Log.d(TAG, "SMS already processed (notification exists): $messageHash")
+                return ProcessingResult(false, reason = "Duplicate transaction")
+            }
+            
+            // Check 2: Check for similar expense by amount, date, and merchant
+            val existingExpense = expenseDao.findSimilarExpense(
+                amount = parsedTransaction.amount.toDouble(),
+                startTime = timestamp - 300000, // 5 minutes before
+                endTime = timestamp + 300000,   // 5 minutes after
+                description = parsedTransaction.merchant ?: "SMS Transaction"
+            )
             
             if (existingExpense != null) {
-                Log.d(TAG, "Transaction already exists: $transactionHash")
+                Log.d(TAG, "Similar expense already exists: ${existingExpense.id}")
                 return ProcessingResult(false, reason = "Duplicate transaction")
             }
 
@@ -125,10 +140,10 @@ class SmsTransactionProcessor(
             
             if (autoCreate) {
                 // Auto-create mode: Create expense immediately
-                return createExpenseFromTransaction(parsedTransaction, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
+                return createExpenseFromTransaction(parsedTransaction, sender, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
             } else {
                 // Manual mode: Save as pending for user confirmation
-                return savePendingTransaction(parsedTransaction, smsBody, timestamp)
+                return savePendingTransaction(parsedTransaction, sender, smsBody, timestamp)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving transaction: ${e.message}", e)
@@ -141,18 +156,19 @@ class SmsTransactionProcessor(
      */
     private suspend fun savePendingTransaction(
         parsedTransaction: ParsedTransaction,
+        sender: String,
         smsBody: String,
         timestamp: Long
     ): ProcessingResult {
         return try {
-            val transactionHash = generateTransactionHash(parsedTransaction, timestamp)
+            val messageHash = generateMessageHash(sender, smsBody, timestamp)
             
             // Create notification entity with parsed details
             val notification = BankNotificationEntity(
                 packageName = "SMS",
                 senderAlias = parsedTransaction.sender,
                 messageBody = smsBody,
-                messageHash = transactionHash,
+                messageHash = messageHash,
                 postedAt = Instant.ofEpochMilli(timestamp)
                     .atZone(ZoneId.systemDefault())
                     .toLocalDateTime(),
@@ -185,6 +201,7 @@ class SmsTransactionProcessor(
      */
     private suspend fun createExpenseFromTransaction(
         parsedTransaction: ParsedTransaction,
+        sender: String,
         smsBody: String,
         timestamp: Long,
         status: SmsTransactionStatus
@@ -236,13 +253,13 @@ class SmsTransactionProcessor(
             if (expenseId != -1L) {
                 Log.d(TAG, "Created expense with ID: $expenseId")
                 
-                // Log the notification with transaction ID
-                val transactionHash = generateTransactionHash(parsedTransaction, timestamp)
+                // Log the notification with transaction ID using message hash
+                val messageHash = generateMessageHash(sender, smsBody, timestamp)
                 val notification = BankNotificationEntity(
                     packageName = "SMS",
                     senderAlias = parsedTransaction.sender,
                     messageBody = smsBody,
-                    messageHash = transactionHash,
+                    messageHash = messageHash,
                     postedAt = Instant.ofEpochMilli(timestamp)
                         .atZone(ZoneId.systemDefault())
                         .toLocalDateTime(),
@@ -471,6 +488,15 @@ class SmsTransactionProcessor(
             return ProcessingResult(false, reason = e.message)
         }
     }
+    /**
+     * Generate a unique hash for the SMS message to detect duplicates
+     * Uses sender + body + timestamp to create a unique identifier
+     */
+    private fun generateMessageHash(sender: String, body: String, timestamp: Long): String {
+        val data = "$sender|$body|$timestamp"
+        return hash(data)
+    }
+
     private fun hash(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray())

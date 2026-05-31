@@ -29,6 +29,7 @@ import java.time.format.DateTimeFormatter
 fun PendingSmsCompactCard(
     viewModel : SmsTransactionViewModel,
     onViewAll : () -> Unit,
+    navController: androidx.navigation.NavController,
     modifier  : Modifier = Modifier
 ) {
     val pendingTransactions by viewModel.pendingTransactions
@@ -179,7 +180,8 @@ fun PendingSmsCompactCard(
                     projectId      = projId
                 )
                 selectedTransaction = null
-            }
+            },
+            navController = navController
         )
     }
 }

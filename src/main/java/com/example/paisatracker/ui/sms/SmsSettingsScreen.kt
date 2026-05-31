@@ -188,6 +188,23 @@ fun SmsSettingsScreen(
                 )
             }
 
+            // Scan History section
+            SectionLabel("Scan History")
+            SettingsGroup {
+                SettingNavigationRow(
+                    icon        = Icons.Default.History,
+                    title       = "SMS History Scan",
+                    description = "Import past transactions from SMS inbox",
+                    onClick     = { navController.navigate("sms_history_scan") }
+                )
+                HorizontalDivider(
+                    modifier  = Modifier.padding(horizontal = 16.dp),
+                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    thickness = 0.5.dp
+                )
+                ClearScanHistoryRow(viewModel = viewModel)
+            }
+
             // How it works card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -247,6 +264,123 @@ fun SmsSettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ClearScanHistoryRow(viewModel: SmsTransactionViewModel) {
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val successMessage by viewModel.successMessage.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    // Show success/error messages
+    LaunchedEffect(successMessage) {
+        successMessage?.let {
+            // Message will be shown in a snackbar or toast
+            viewModel.clearSuccessMessage()
+        }
+    }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            // Message will be shown in a snackbar or toast
+            viewModel.clearErrorMessage()
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isLoading) { showConfirmDialog = true }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.DeleteSweep,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Clear Scan History",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Delete all SMS scan data and expenses",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    }
+
+    // Confirmation dialog
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Clear Scan History?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "This will permanently delete:\n\n" +
+                            "• All bank notifications from SMS scans\n" +
+                            "• All expenses created from SMS scans\n\n" +
+                            "This action cannot be undone. You can re-scan your SMS inbox after clearing.",
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmDialog = false
+                        viewModel.clearScanHistory()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Clear History")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

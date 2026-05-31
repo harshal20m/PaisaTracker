@@ -52,6 +52,11 @@ fun AppTourSheet(
             "Create Projects for major life areas (like Home or Work) and Categories to track specific spending habits."
         ),
         TourPage(
+            "🏦",
+            "Add Your Bank Account",
+            "Connect your bank account to automatically track transactions from SMS. We support 200+ banks worldwide using our powerful parser!"
+        ),
+        TourPage(
             "⚡",
             "Quick Add Everything",
             "Use the lightning-fast Quick Add button to log expenses in seconds. Never miss a single transaction again."

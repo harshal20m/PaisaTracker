@@ -13,7 +13,8 @@ class PaisaTrackerRepository(
     private val flapDao: FlapDao,
     private val salaryRecordDao: SalaryRecordDao,
     private val actionHistoryDao: ActionHistoryDao,
-    private val bankAccountDao: BankAccountDao
+    private val bankAccountDao: BankAccountDao,
+    private val bankNotificationDao: BankNotificationDao
 ) {
     // ── Bank Account Methods ──────────────────────────────────────────────────
     
@@ -382,6 +383,9 @@ class PaisaTrackerRepository(
         expense.bankAccountId?.let { accountId ->
             incrementBankAccountBalance(accountId, expense.amount)
         }
+        
+        // Reset bank notification link to allow re-scanning
+        bankNotificationDao.resetTransactionLink(expense.id)
         
         expenseDao.deleteExpense(expense)
     }

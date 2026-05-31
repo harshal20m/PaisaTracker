@@ -493,4 +493,29 @@ interface ExpenseDao {
      */
     @Query("SELECT * FROM expenses WHERE description LIKE '%' || :hash || '%' LIMIT 1")
     suspend fun getExpenseByHash(hash: String): Expense?
+
+    /**
+     * Find similar expense by amount, date range, and description similarity
+     * Used for deduplication during SMS history scan
+     *
+     * @param amount Transaction amount
+     * @param startTime Start of time window (transaction time - 5 minutes)
+     * @param endTime End of time window (transaction time + 5 minutes)
+     * @param description Transaction description (for LIKE search)
+     * @return Expense if found, null otherwise
+     */
+    @Query("""
+        SELECT * FROM expenses
+        WHERE ABS(amount - :amount) < 0.01
+        AND date >= :startTime
+        AND date <= :endTime
+        AND description LIKE '%' || :description || '%'
+        LIMIT 1
+    """)
+    suspend fun findSimilarExpense(
+        amount: Double,
+        startTime: Long,
+        endTime: Long,
+        description: String
+    ): Expense?
 }

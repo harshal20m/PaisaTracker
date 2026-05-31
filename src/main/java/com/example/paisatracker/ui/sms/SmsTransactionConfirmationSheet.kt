@@ -1,5 +1,6 @@
 package com.example.paisatracker.ui.sms
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.paisatracker.data.BankNotificationEntity
 import com.example.paisatracker.data.Category
 import com.example.paisatracker.data.Project
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -30,7 +32,8 @@ fun SmsTransactionConfirmationSheet(
     transaction : BankNotificationEntity,
     viewModel   : SmsTransactionViewModel,
     onDismiss   : () -> Unit,
-    onConfirm   : (categoryId: Long?, projectId: Long?) -> Unit
+    onConfirm   : (categoryId: Long?, projectId: Long?) -> Unit,
+    navController: androidx.navigation.NavController
 ) {
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val projects   by viewModel.projects.collectAsStateWithLifecycle()
@@ -39,6 +42,12 @@ fun SmsTransactionConfirmationSheet(
     var selectedProject    by remember { mutableStateOf<Project?>(null) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showProjectPicker  by remember { mutableStateOf(false) }
+    var isDetecting        by remember { mutableStateOf(false) }
+    var showRulesDisabledDialog by remember { mutableStateOf(false) }
+    var showNoRuleFoundDialog by remember { mutableStateOf(false) }
+    var noRuleMerchantName by remember { mutableStateOf("") }
+    
+    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -211,6 +220,49 @@ fun SmsTransactionConfirmationSheet(
             title     = "Select Category",
             items     = categories,
             onDismiss = { showCategoryPicker = false },
+            showDetectOption = transaction.merchant != null,
+            isDetecting = isDetecting,
+            onDetectClick = {
+                Log.d("SmsConfirmationSheet", "=== DETECT BUTTON CLICKED ===")
+                Log.d("SmsConfirmationSheet", "Transaction merchant: ${transaction.merchant}")
+                
+                // Check if merchant rules are enabled first
+                scope.launch {
+                    val rulesEnabled = viewModel.smsPreferences.getUseMerchantRules()
+                    Log.d("SmsConfirmationSheet", "Merchant rules enabled: $rulesEnabled")
+                    
+                    if (!rulesEnabled) {
+                        Log.d("SmsConfirmationSheet", "Rules disabled, showing dialog")
+                        showRulesDisabledDialog = true
+                        return@launch
+                    }
+                    
+                    Log.d("SmsConfirmationSheet", "Setting isDetecting to true")
+                    isDetecting = true
+                    
+                    Log.d("SmsConfirmationSheet", "Coroutine launched, calling detectUsingRules...")
+                    val result = viewModel.detectUsingRules(transaction.merchant)
+                    Log.d("SmsConfirmationSheet", "Detection result received:")
+                    Log.d("SmsConfirmationSheet", "  - Rule matched: ${result.ruleMatched}")
+                    Log.d("SmsConfirmationSheet", "  - Category: ${result.category?.name}")
+                    Log.d("SmsConfirmationSheet", "  - Project: ${result.project?.name}")
+                    
+                    isDetecting = false
+                    Log.d("SmsConfirmationSheet", "Setting isDetecting to false")
+                    
+                    if (result.ruleMatched && result.category != null) {
+                        Log.d("SmsConfirmationSheet", "✓ Applying detected category and project")
+                        selectedCategory = result.category
+                        selectedProject = result.project
+                        showCategoryPicker = false
+                        Log.d("SmsConfirmationSheet", "Category picker closed")
+                    } else {
+                        Log.d("SmsConfirmationSheet", "✗ No rule matched, showing dialog")
+                        noRuleMerchantName = transaction.merchant ?: "Unknown"
+                        showNoRuleFoundDialog = true
+                    }
+                }
+            },
             itemContent = { category ->
                 PickerDialogRow(
                     emoji    = category.emoji,
@@ -234,6 +286,108 @@ fun SmsTransactionConfirmationSheet(
                     selected = selectedProject?.id == project.id,
                     onClick  = { selectedProject = project; showProjectPicker = false }
                 )
+            }
+        )
+    }
+    
+    // Rules Disabled Dialog
+    if (showRulesDisabledDialog) {
+        AlertDialog(
+            onDismissRequest = { showRulesDisabledDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Merchant Rules Disabled",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Merchant rules are currently disabled. Enable them in SMS Settings to automatically detect categories based on merchant names.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Log.d("SmsConfirmationSheet", "Go to Settings clicked")
+                        showRulesDisabledDialog = false
+                        navController.navigate("sms_settings")
+                        Log.d("SmsConfirmationSheet", "Navigation to sms_settings triggered")
+                        onDismiss()
+                    }
+                ) {
+                    Text("Go to Settings")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRulesDisabledDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // No Rule Found Dialog
+    if (showNoRuleFoundDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoRuleFoundDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "No Rule Found",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "No merchant rule found for:",
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "\"$noRuleMerchantName\"",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Create a rule in Merchant Rules to automatically categorize transactions from this merchant.",
+                        fontSize = 14.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Log.d("SmsConfirmationSheet", "Create Rule clicked for merchant: $noRuleMerchantName")
+                        showNoRuleFoundDialog = false
+                        navController.navigate("merchant_rules")
+                        Log.d("SmsConfirmationSheet", "Navigation to merchant_rules triggered")
+                        onDismiss()
+                    }
+                ) {
+                    Text("Create Rule")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoRuleFoundDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -353,10 +507,13 @@ private fun PickerSelectorCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> DarkPickerDialog(
-    title       : String,
-    items       : List<T>,
-    onDismiss   : () -> Unit,
-    itemContent : @Composable (T) -> Unit
+    title            : String,
+    items            : List<T>,
+    onDismiss        : () -> Unit,
+    showDetectOption : Boolean = false,
+    isDetecting      : Boolean = false,
+    onDetectClick    : () -> Unit = {},
+    itemContent      : @Composable (T) -> Unit
 ) {
     AlertDialog(onDismissRequest = onDismiss) {
         Surface(
@@ -378,6 +535,52 @@ private fun <T> DarkPickerDialog(
                     color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                     thickness = 0.5.dp
                 )
+                
+                // Detect using rules option
+                if (showDetectOption) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isDetecting, onClick = onDetectClick)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = if (isDetecting) "Detecting..." else "Detect using rules",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isDetecting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.ArrowForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                        thickness = 0.5.dp
+                    )
+                }
+                
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {
                     items(items) { item -> itemContent(item) }
                 }

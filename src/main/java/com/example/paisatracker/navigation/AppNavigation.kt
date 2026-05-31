@@ -33,6 +33,7 @@ import com.example.paisatracker.ui.bin.BinScreen
 import com.example.paisatracker.ui.sms.MerchantRulesScreen
 import com.example.paisatracker.ui.sms.MerchantRuleViewModel
 import com.example.paisatracker.ui.sms.PendingSmsTransactionsScreen
+import com.example.paisatracker.ui.sms.SmsHistoryScanScreen
 import com.example.paisatracker.ui.sms.SmsSettingsScreen
 import com.example.paisatracker.ui.trash.TrashScreen
 import com.example.paisatracker.ui.trash.TrashViewModel
@@ -188,6 +189,11 @@ fun AppNavigation(
             MerchantRulesScreen(
                 navController = navController,
                 viewModel = merchantRuleViewModel
+            )
+        }
+        composable("sms_history_scan") {
+            SmsHistoryScanScreen(
+                navController = navController
             )
         }
     }

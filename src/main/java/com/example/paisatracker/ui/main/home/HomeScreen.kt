@@ -45,7 +45,9 @@ import com.example.paisatracker.ui.search.SearchViewModel
 import com.example.paisatracker.ui.search.SearchViewModelFactory
 import com.example.paisatracker.ui.settings.UpdateRow
 import com.example.paisatracker.ui.bin.BinSheetContent
+import com.example.paisatracker.ui.sms.HistoryScanCard
 import com.example.paisatracker.ui.sms.PendingSmsCompactCard
+import com.example.paisatracker.ui.sms.SmsHistoryScanViewModel
 import com.example.paisatracker.ui.sms.SmsTransactionViewModel
 import com.example.paisatracker.ui.trash.TrashScreen
 import com.example.paisatracker.ui.trash.TrashViewModel
@@ -70,6 +72,11 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     // ── SMS Transactions ──────────────────────────────────────────────────────
     val smsViewModel = remember {
         SmsTransactionViewModel(application)
+    }
+    
+    // ── SMS History Scan ──────────────────────────────────────────────────────
+    val smsHistoryScanViewModel = remember {
+        SmsHistoryScanViewModel(application)
     }
     
     // ── SMS Trash ─────────────────────────────────────────────────────────────
@@ -248,10 +255,17 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                             onTransactionClick = { navController.navigate("expense_details/$it") }
                         )
 
+                        // SMS History Scan Card
+                        HistoryScanCard(
+                            viewModel = smsHistoryScanViewModel,
+                            onScanClick = { navController.navigate("sms_history_scan") }
+                        )
+                        
                         // Pending SMS Transactions Card
                         PendingSmsCompactCard(
                             viewModel = smsViewModel,
-                            onViewAll = { navController.navigate("pending_sms") }
+                            onViewAll = { navController.navigate("pending_sms") },
+                            navController = navController
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
