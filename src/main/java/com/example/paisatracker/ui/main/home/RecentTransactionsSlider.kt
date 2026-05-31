@@ -3,8 +3,6 @@ package com.example.paisatracker.ui.main.home
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,8 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,49 +31,45 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun RecentTransactionsSlider(
-    expenses: List<RecentExpense>,
+    expenses      : List<RecentExpense>,
     onExpenseClick: (RecentExpense) -> Unit,
-    onMoreClick: () -> Unit,
-    showMore: Boolean = false,
-    onLoadMore: () -> Unit = {}
+    onMoreClick   : () -> Unit,
+    showMore      : Boolean = false,
+    onLoadMore    : () -> Unit = {}
 ) {
     val display = expenses.take(if (showMore) expenses.size else 10)
-    
     if (display.isEmpty()) return
 
-    // Animation state for entrance
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(100)
-        visible = true
-    }
+    LaunchedEffect(Unit) { delay(100); visible = true }
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(animationSpec = tween(400)) + slideInVertically(
+        enter   = fadeIn(tween(400)) + slideInVertically(
             initialOffsetY = { it / 4 },
-            animationSpec = tween(400, easing = FastOutSlowInEasing)
+            animationSpec  = tween(400, easing = FastOutSlowInEasing)
         )
     ) {
         Column(
-            modifier = Modifier
+            modifier            = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header with animation
+            // ── Header ────────────────────────────────────────────────────────
             Row(
-                modifier = Modifier
+                modifier              = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment     = Alignment.CenterVertically
             ) {
                 Column {
                     Text(
                         "Recent Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        style      = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         "${display.size} transaction${if (display.size != 1) "s" else ""}",
@@ -85,408 +77,379 @@ fun RecentTransactionsSlider(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                
+
                 OutlinedButton(
-                    onClick = onMoreClick,
-                    modifier = Modifier.height(40.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    onClick          = onMoreClick,
+                    modifier         = Modifier.height(36.dp),
+                    shape            = RoundedCornerShape(18.dp),
+                    border           = androidx.compose.foundation.BorderStroke(
+                        1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
                     ),
-                    colors = ButtonDefaults.outlinedButtonColors(
+                    colors           = ButtonDefaults.outlinedButtonColors(
                         containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface
+                        contentColor   = MaterialTheme.colorScheme.onSurface
                     ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding   = PaddingValues(horizontal = 14.dp, vertical = 0.dp)
                 ) {
                     Text(
                         if (showMore) "View Less" else "View All",
-                        style = MaterialTheme.typography.labelLarge,
+                        style      = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(Modifier.width(4.dp))
                     Icon(
-                        if (showMore) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.ArrowForward,
+                        if (showMore) Icons.Default.KeyboardArrowUp
+                        else Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier           = Modifier.size(16.dp)
                     )
                 }
             }
 
             if (!showMore) {
+                // ── Horizontal scroll row ─────────────────────────────────────
                 val listState = rememberLazyListState()
-                
+
                 LazyRow(
-                    state = listState,
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    state               = listState,
+                    contentPadding      = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier            = Modifier.fillMaxWidth()
                 ) {
-                    items(
-                        items = display,
-                        key = { it.id }
-                    ) { expense ->
+                    items(display, key = { it.id }) { expense ->
                         AnimatedTransactionCard(
                             expense = expense,
                             onClick = { onExpenseClick(expense) }
                         )
                     }
-                    
-                    item {
-                        AnimatedMoreCard(onClick = onMoreClick)
-                    }
+                    item { AnimatedMoreCard(onClick = onMoreClick) }
                 }
-                
-                // Swipe indicator
+
+                // Scroll indicator dots
                 if (display.size > 2) {
                     Row(
-                        modifier = Modifier
+                        modifier              = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp),
+                            .padding(horizontal = 20.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.Center
                     ) {
                         repeat(minOf(display.size, 5)) { index ->
                             val isActive = remember {
-                                derivedStateOf {
-                                    val firstVisibleIndex = listState.firstVisibleItemIndex
-                                    index == firstVisibleIndex
-                                }
+                                derivedStateOf { listState.firstVisibleItemIndex == index }
                             }
-                            
                             Box(
                                 modifier = Modifier
                                     .padding(horizontal = 2.dp)
+                                    .animateContentSize(
+                                        spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness    = Spring.StiffnessLow
+                                        )
+                                    )
                                     .size(
-                                        width = if (isActive.value) 16.dp else 6.dp,
+                                        width  = if (isActive.value) 16.dp else 6.dp,
                                         height = 6.dp
                                     )
                                     .clip(RoundedCornerShape(3.dp))
                                     .background(
-                                        if (isActive.value)
-                                            MaterialTheme.colorScheme.primary
-                                        else
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    .animateContentSize(
-                                        animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessLow
-                                        )
+                                        if (isActive.value) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant
                                     )
                             )
                         }
                     }
                 }
+
             } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                display.chunked(2).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        row.forEach { expense ->
-                            RecentTransactionGridItem(
-                                expense = expense,
-                                onClick = { onExpenseClick(expense) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-                
-                OutlinedButton(
-                    onClick = onLoadMore,
-                    modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    )
+                // ── Grid view (expanded) ──────────────────────────────────────
+                Column(
+                    modifier            = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Load More", fontWeight = FontWeight.Medium)
+                    display.chunked(2).forEach { row ->
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            row.forEach { expense ->
+                                RecentTransactionGridItem(
+                                    expense = expense,
+                                    onClick = { onExpenseClick(expense) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick        = onLoadMore,
+                        modifier       = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .padding(top = 4.dp),
+                        shape          = RoundedCornerShape(12.dp),
+                        border         = androidx.compose.foundation.BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                        ),
+                        colors         = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor   = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text("Load More", fontWeight = FontWeight.Medium)
+                    }
                 }
             }
         }
     }
+}
+
+// ── Transaction card (horizontal scroll) ─────────────────────────────────────
+@Composable
+private fun AnimatedTransactionCard(
+    expense : RecentExpense,
+    onClick : () -> Unit
+) {
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue  = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label        = "scale"
+    )
+    val elevation by animateDpAsState(
+        targetValue  = if (isPressed) 0.dp else 2.dp,
+        animationSpec = tween(150),
+        label        = "elevation"
+    )
+
+    Card(
+        onClick           = onClick,
+        modifier          = Modifier
+            .width(160.dp)
+            .height(110.dp)
+            .scale(scale),
+        shape             = RoundedCornerShape(18.dp),
+        // Solid surface — no alpha blending that bleeds on light themes
+        colors            = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation         = CardDefaults.cardElevation(defaultElevation = elevation),
+        interactionSource = interactionSource
+    ) {
+        Column(
+            modifier            = Modifier
+                .padding(12.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Top: emoji + date
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        // primaryContainer is fine here — small chip, doesn't dominate
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(expense.categoryEmoji.ifBlank { "💸" }, fontSize = 16.sp)
+                }
+                Text(
+                    SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Middle: description + category
+            Column {
+                Text(
+                    expense.description,
+                    style      = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    color      = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    expense.categoryName.ifBlank { "Other" },
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Bottom: amount
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.errorContainer
+            ) {
+                Text(
+                    formatCurrency(expense.amount),
+                    modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style      = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color      = MaterialTheme.colorScheme.error
+                )
+            }
+        }
     }
 }
 
+// ── Grid item (expanded view) ─────────────────────────────────────────────────
 @Composable
 private fun RecentTransactionGridItem(
-    expense: RecentExpense,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    expense  : RecentExpense,
+    onClick  : () -> Unit,
+    modifier : Modifier = Modifier
 ) {
     Card(
-        onClick = onClick,
-        modifier = modifier.height(100.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
+        onClick   = onClick,
+        modifier  = modifier.height(100.dp),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
+        Column(
+            modifier            = Modifier.padding(10.dp).fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier.padding(10.dp),
-                verticalArrangement = Arrangement.SpaceBetween
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(expense.categoryEmoji.ifBlank { "💸" }, fontSize = 14.sp)
-                    }
-                    
-                    Text(
-                        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
-                    )
+                    Text(expense.categoryEmoji.ifBlank { "💸" }, fontSize = 14.sp)
                 }
+                Text(
+                    SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date)),
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+            }
 
-                Column {
-                    Text(
-                        expense.description,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        expense.categoryName.ifBlank { "Other" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            Column {
+                Text(
+                    expense.description,
+                    style      = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    color      = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    expense.categoryName.ifBlank { "Other" },
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
+            Surface(
+                shape = RoundedCornerShape(5.dp),
+                color = MaterialTheme.colorScheme.errorContainer
+            ) {
                 Text(
                     formatCurrency(expense.amount),
-                    style = MaterialTheme.typography.labelLarge,
+                    modifier   = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    style      = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.error
+                    color      = MaterialTheme.colorScheme.error
                 )
             }
         }
     }
 }
 
-@Composable
-private fun AnimatedTransactionCard(
-    expense: RecentExpense,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "card_scale"
-    )
-    
-    val elevation by animateDpAsState(
-        targetValue = if (isPressed) 0.dp else 2.dp,
-        animationSpec = tween(150),
-        label = "card_elevation"
-    )
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .width(160.dp)
-            .height(110.dp)
-            .scale(scale),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation),
-        interactionSource = interactionSource
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(expense.categoryEmoji.ifBlank { "💸" }, fontSize = 16.sp)
-                    }
-                    
-                    Text(
-                        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Column {
-                    Text(
-                        expense.description,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        expense.categoryName.ifBlank { "Other" },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Text(
-                    formatCurrency(expense.amount),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-        }
-    }
-}
-
+// ── "View All" card at end of horizontal scroll ───────────────────────────────
 @Composable
 private fun AnimatedMoreCard(onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "more_card_scale"
+        targetValue  = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow),
+        label        = "more_scale"
     )
-    
-    // Subtle pulsing animation
+
+    // Subtle pulse on the inner icon circle only
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.05f,
+        targetValue  = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
+            animation  = tween(1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulse_scale"
+        label = "pulse"
     )
 
     Card(
-        onClick = onClick,
-        modifier = Modifier
+        onClick           = onClick,
+        modifier          = Modifier
             .width(120.dp)
             .height(110.dp)
             .scale(scale),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        shape             = RoundedCornerShape(18.dp),
+        // Solid primaryContainer — intentional, contained, readable
+        colors            = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isPressed) 0.dp else 2.dp),
+        elevation         = CardDefaults.cardElevation(
+            defaultElevation = if (isPressed) 0.dp else 2.dp
+        ),
         interactionSource = interactionSource
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            Color.Transparent
-                        ),
-                        center = androidx.compose.ui.geometry.Offset(60f, 55f),
-                        radius = 100f
-                    )
-                ),
+            modifier         = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(44.dp)
                         .scale(pulseScale)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = "View all transactions",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        tint               = MaterialTheme.colorScheme.onPrimary,
+                        modifier           = Modifier.size(22.dp)
                     )
                 }
-                
                 Text(
                     "View All",
-                    style = MaterialTheme.typography.labelLarge,
+                    style      = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color      = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }

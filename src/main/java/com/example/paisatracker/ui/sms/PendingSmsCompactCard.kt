@@ -27,10 +27,10 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun PendingSmsCompactCard(
-    viewModel : SmsTransactionViewModel,
-    onViewAll : () -> Unit,
-    navController: androidx.navigation.NavController,
-    modifier  : Modifier = Modifier
+    viewModel     : SmsTransactionViewModel,
+    onViewAll     : () -> Unit,
+    navController : androidx.navigation.NavController,
+    modifier      : Modifier = Modifier
 ) {
     val pendingTransactions by viewModel.pendingTransactions
         .collectAsStateWithLifecycle(initialValue = emptyList())
@@ -45,93 +45,95 @@ fun PendingSmsCompactCard(
         Card(
             modifier  = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            shape     = RoundedCornerShape(18.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            shape     = RoundedCornerShape(16.dp),
+            // Use surface — always solid, always readable on any theme
             colors    = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            border    = androidx.compose.foundation.BorderStroke(
-                1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-            )
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
 
-                // Header
-                Row(
-                    modifier              = Modifier
+                // ── Coloured top stripe ───────────────────────────────────────
+                // Gives the card a strong visual identity without relying on
+                // a background colour that might clash with the theme
+                Box(
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Row(
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier              = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Icon(
                                 Icons.Default.Message,
                                 contentDescription = null,
                                 tint               = MaterialTheme.colorScheme.primary,
-                                modifier           = Modifier.size(17.dp)
+                                modifier           = Modifier.size(18.dp)
                             )
+                            Column {
+                                Text(
+                                    text       = "Pending from SMS",
+                                    fontSize   = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color      = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text     = "Tap ✓ to confirm or ✕ to dismiss",
+                                    fontSize = 11.sp,
+                                    color    = MaterialTheme.colorScheme.onPrimaryContainer
+                                        .copy(alpha = 0.65f)
+                                )
+                            }
                         }
-                        Column {
-                            Text(
-                                text       = "Pending from SMS",
-                                fontSize   = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color      = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text     = "Needs your attention",
-                                fontSize = 11.sp,
-                                color    = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
 
-                    Surface(
-                        shape = RoundedCornerShape(100.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Text(
-                            text       = "${pendingTransactions.size}",
-                            modifier   = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                            fontSize   = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color      = MaterialTheme.colorScheme.onPrimary
-                        )
+                        // Count badge
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                text       = "${pendingTransactions.size}",
+                                modifier   = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                fontSize   = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color      = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
 
-                HorizontalDivider(
-                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                    thickness = 0.5.dp
-                )
-
-                // Transaction rows
-                pendingTransactions.take(2).forEach { txn ->
+                // ── Transaction rows (max 2) ───────────────────────────────────
+                pendingTransactions.take(2).forEachIndexed { index, txn ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier  = Modifier.padding(horizontal = 16.dp),
+                            color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            thickness = 0.5.dp
+                        )
+                    }
                     CompactTransactionRow(
                         transaction = txn,
                         onConfirm   = { selectedTransaction = txn },
                         onReject    = { viewModel.rejectTransaction(txn.id) }
                     )
-                    HorizontalDivider(
-                        color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                        thickness = 0.5.dp
-                    )
                 }
 
-                // Overflow label
+                // ── Overflow indicator ────────────────────────────────────────
                 if (pendingTransactions.size > 2) {
+                    HorizontalDivider(
+                        modifier  = Modifier.padding(horizontal = 16.dp),
+                        color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        thickness = 0.5.dp
+                    )
                     Box(
                         modifier         = Modifier
                             .fillMaxWidth()
@@ -139,18 +141,18 @@ fun PendingSmsCompactCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text     = "+${pendingTransactions.size - 2} more",
+                            text     = "+${pendingTransactions.size - 2} more transaction${if (pendingTransactions.size - 2 != 1) "s" else ""}",
                             fontSize = 12.sp,
-                            color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
-                    HorizontalDivider(
-                        color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                        thickness = 0.5.dp
-                    )
                 }
 
-                // View All
+                // ── View All button ───────────────────────────────────────────
+                HorizontalDivider(
+                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    thickness = 0.5.dp
+                )
                 TextButton(
                     onClick  = onViewAll,
                     modifier = Modifier
@@ -168,12 +170,13 @@ fun PendingSmsCompactCard(
         }
     }
 
+    // ── Confirmation sheet ────────────────────────────────────────────────────
     selectedTransaction?.let { txn ->
         SmsTransactionConfirmationSheet(
-            transaction = txn,
-            viewModel   = viewModel,
-            onDismiss   = { selectedTransaction = null },
-            onConfirm   = { catId, projId ->
+            transaction   = txn,
+            viewModel     = viewModel,
+            onDismiss     = { selectedTransaction = null },
+            onConfirm     = { catId, projId ->
                 viewModel.confirmTransaction(
                     notificationId = txn.id,
                     categoryId     = catId,
@@ -186,6 +189,7 @@ fun PendingSmsCompactCard(
     }
 }
 
+// ── Single compact row ────────────────────────────────────────────────────────
 @Composable
 private fun CompactTransactionRow(
     transaction : BankNotificationEntity,
@@ -199,6 +203,7 @@ private fun CompactTransactionRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically
     ) {
+        // Left: merchant + amount + time
         Column(
             modifier            = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -206,26 +211,33 @@ private fun CompactTransactionRow(
             Text(
                 text       = transaction.merchant ?: transaction.bankName ?: "Transaction",
                 fontSize   = 14.sp,
-                fontWeight = FontWeight.Medium,
+                fontWeight = FontWeight.SemiBold,
                 color      = MaterialTheme.colorScheme.onSurface,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis
             )
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text       = "₹${String.format("%.2f", transaction.amount ?: 0.0)}",
-                    fontSize   = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.error
-                )
+                // Amount chip
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text       = "₹${String.format("%.2f", transaction.amount ?: 0.0)}",
+                        modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        fontSize   = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.error
+                    )
+                }
                 transaction.bankName?.let {
                     Text(
-                        text     = "· $it",
+                        text     = it,
                         fontSize = 11.sp,
-                        color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -236,33 +248,38 @@ private fun CompactTransactionRow(
             )
         }
 
+        Spacer(Modifier.width(8.dp))
+
+        // Right: action buttons
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            IconButton(
+            // Confirm
+            FilledIconButton(
                 onClick  = onConfirm,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
+                modifier = Modifier.size(36.dp),
+                colors   = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor   = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(
                     Icons.Default.CheckCircle,
                     contentDescription = "Confirm",
-                    tint               = MaterialTheme.colorScheme.primary,
                     modifier           = Modifier.size(20.dp)
                 )
             }
-            IconButton(
+            // Reject
+            FilledIconButton(
                 onClick  = onReject,
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                modifier = Modifier.size(36.dp),
+                colors   = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor   = MaterialTheme.colorScheme.error
+                )
             ) {
                 Icon(
                     Icons.Default.Close,
                     contentDescription = "Reject",
-                    tint               = MaterialTheme.colorScheme.error,
-                    modifier           = Modifier.size(20.dp)
+                    modifier           = Modifier.size(18.dp)
                 )
             }
         }

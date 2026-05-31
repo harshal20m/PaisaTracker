@@ -51,8 +51,8 @@ android {
         applicationId = "com.example.paisatracker"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
-        versionName = "v3.0.0"
+        versionCode = 4
+        versionName = "v4.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

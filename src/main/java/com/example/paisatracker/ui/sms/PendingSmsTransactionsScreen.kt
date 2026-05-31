@@ -103,6 +103,12 @@ fun PendingSmsTransactionsScreen(
                         selectedTransactionIds = setOf()
                     }
                 },
+                onSelectAll = {
+                    selectedTransactionIds = pendingTransactions.map { it.id }.toSet()
+                },
+                onDeselectAll = {
+                    selectedTransactionIds = setOf()
+                },
                 onBulkConfirm = {
                     if (selectedTransactionIds.isNotEmpty()) {
                         showBulkConfirmSheet = true
@@ -195,6 +201,8 @@ private fun PendingScreenHeader(
     isSelectionMode: Boolean,
     selectedCount: Int,
     onToggleSelectionMode: () -> Unit,
+    onSelectAll: () -> Unit,
+    onDeselectAll: () -> Unit,
     onBulkConfirm: () -> Unit
 ) {
     Column(
@@ -258,29 +266,59 @@ private fun PendingScreenHeader(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Text(
-                    text       = "$selectedCount Selected",
-                    fontSize   = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.onBackground,
-                    lineHeight = 34.sp
-                )
+                Column {
+                    Text(
+                        text       = "$selectedCount Selected",
+                        fontSize   = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onBackground,
+                        lineHeight = 34.sp
+                    )
+                }
                 
-                if (selectedCount > 0) {
-                    Button(
-                        onClick = onBulkConfirm,
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Select All / Deselect All button
+                    OutlinedButton(
+                        onClick = if (selectedCount == count) onDeselectAll else onSelectAll,
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp, MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Icon(
-                            Icons.Default.Check,
+                            if (selectedCount == count) Icons.Default.Clear else Icons.Default.CheckCircle,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Confirm", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (selectedCount == count) "Clear" else "All",
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    
+                    // Confirm button
+                    if (selectedCount > 0) {
+                        Button(
+                            onClick = onBulkConfirm,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("Confirm", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
