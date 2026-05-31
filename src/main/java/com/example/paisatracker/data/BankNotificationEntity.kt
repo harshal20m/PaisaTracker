@@ -10,7 +10,8 @@ enum class SmsTransactionStatus {
     PENDING,    // Waiting for user confirmation
     CONFIRMED,  // User confirmed and expense created
     REJECTED,   // User rejected - moved to trash
-    AUTO_CREATED // Automatically created (when auto-mode is ON)
+    AUTO_CREATED, // Automatically created (when auto-mode is ON)
+    CREDIT_PENDING  // Credit transaction waiting for user action
 }
 
 @Entity(
@@ -65,6 +66,10 @@ data class BankNotificationEntity(
 
     @ColumnInfo(name = "account_last4")
     val accountLast4: String? = null,
+    
+    // Transaction type (EXPENSE, INCOME, etc.)
+    @ColumnInfo(name = "transaction_type")
+    val transactionType: String? = null,
 
     // Trash-related fields
     @ColumnInfo(name = "rejected_at")

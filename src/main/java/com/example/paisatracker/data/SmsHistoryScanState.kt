@@ -22,7 +22,8 @@ sealed class SmsHistoryScanState {
         val createdExpenses: Int,
         val skippedDuplicates: Int,
         val failedMessages: Int,
-        val scanDurationMs: Long
+        val scanDurationMs: Long,
+        val scanResults: List<SmsScanResult> = emptyList()
     ) : SmsHistoryScanState()
     data class Error(val message: String, val throwable: Throwable? = null) : SmsHistoryScanState()
     object Cancelled : SmsHistoryScanState()

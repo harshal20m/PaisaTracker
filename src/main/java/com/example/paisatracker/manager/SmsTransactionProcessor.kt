@@ -128,22 +128,29 @@ class SmsTransactionProcessor(
                 return ProcessingResult(false, reason = "Duplicate transaction")
             }
 
-            // Only process EXPENSE type transactions for now
-            // Income and other types can be added later
-            if (parsedTransaction.type != TransactionType.EXPENSE) {
-                Log.d(TAG, "Skipping non-expense transaction: ${parsedTransaction.type}")
-                return ProcessingResult(false, reason = "Only expense transactions are supported")
-            }
-
-            // Check if auto-create is enabled
-            val autoCreate = smsPreferences.getAutoCreateExpenses()
-            
-            if (autoCreate) {
-                // Auto-create mode: Create expense immediately
-                return createExpenseFromTransaction(parsedTransaction, sender, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
-            } else {
-                // Manual mode: Save as pending for user confirmation
-                return savePendingTransaction(parsedTransaction, sender, smsBody, timestamp)
+            // Handle different transaction types
+            when (parsedTransaction.type) {
+                TransactionType.EXPENSE -> {
+                    // Check if auto-create is enabled
+                    val autoCreate = smsPreferences.getAutoCreateExpenses()
+                    
+                    if (autoCreate) {
+                        // Auto-create mode: Create expense immediately
+                        return createExpenseFromTransaction(parsedTransaction, sender, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
+                    } else {
+                        // Manual mode: Save as pending for user confirmation
+                        return savePendingTransaction(parsedTransaction, sender, smsBody, timestamp)
+                    }
+                }
+                TransactionType.INCOME, TransactionType.CREDIT -> {
+                    // Save credit transactions as pending for user review
+                    Log.d(TAG, "Credit transaction detected: ${parsedTransaction.amount}")
+                    return savePendingCreditTransaction(parsedTransaction, sender, smsBody, timestamp)
+                }
+                else -> {
+                    Log.d(TAG, "Unsupported transaction type: ${parsedTransaction.type}")
+                    return ProcessingResult(false, reason = "Unsupported transaction type: ${parsedTransaction.type}")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving transaction: ${e.message}", e)
@@ -177,7 +184,8 @@ class SmsTransactionProcessor(
                 amount = parsedTransaction.amount.toDouble(),
                 merchant = parsedTransaction.merchant,
                 bankName = parsedTransaction.bankName,
-                accountLast4 = parsedTransaction.accountLast4
+                accountLast4 = parsedTransaction.accountLast4,
+                transactionType = parsedTransaction.type.name
             )
             
             val notificationId = bankNotificationRepository.insert(notification)
@@ -191,6 +199,51 @@ class SmsTransactionProcessor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving pending transaction: ${e.message}", e)
+            return ProcessingResult(false, reason = e.message)
+        }
+    }
+
+    /**
+     * Saves credit/income transaction as pending for user review
+     */
+    private suspend fun savePendingCreditTransaction(
+        parsedTransaction: ParsedTransaction,
+        sender: String,
+        smsBody: String,
+        timestamp: Long
+    ): ProcessingResult {
+        return try {
+            val messageHash = generateMessageHash(sender, smsBody, timestamp)
+            
+            // Create notification entity with parsed details
+            val notification = BankNotificationEntity(
+                packageName = "SMS",
+                senderAlias = parsedTransaction.sender,
+                messageBody = smsBody,
+                messageHash = messageHash,
+                postedAt = Instant.ofEpochMilli(timestamp)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime(),
+                processed = false,
+                status = SmsTransactionStatus.CREDIT_PENDING,
+                amount = parsedTransaction.amount.toDouble(),
+                merchant = parsedTransaction.merchant ?: "Credit",
+                bankName = parsedTransaction.bankName,
+                accountLast4 = parsedTransaction.accountLast4,
+                transactionType = parsedTransaction.type.name
+            )
+            
+            val notificationId = bankNotificationRepository.insert(notification)
+            
+            if (notificationId != -1L) {
+                Log.d(TAG, "Saved pending credit transaction with ID: $notificationId")
+                return ProcessingResult(true, isPending = true, notificationId = notificationId)
+            } else {
+                Log.d(TAG, "Failed to save pending credit transaction")
+                return ProcessingResult(false, reason = "Failed to save pending credit transaction")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving pending credit transaction: ${e.message}", e)
             return ProcessingResult(false, reason = e.message)
         }
     }

@@ -8,7 +8,10 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -123,10 +126,12 @@ fun SmsHistoryScanScreen(
                 }
                 
                 is SmsHistoryScanState.Completed -> {
+                    val completedState = scanState as SmsHistoryScanState.Completed
                     ScanCompletedContent(
                         summary = scanSummary,
                         onDone = { navController.popBackStack() },
-                        onScanAgain = { viewModel.resetScan() }
+                        onScanAgain = { viewModel.resetScan() },
+                        scanResults = completedState.scanResults
                     )
                 }
                 
@@ -572,8 +577,19 @@ private fun StatCard(
 private fun ScanCompletedContent(
     summary: com.example.paisatracker.data.ScanSummary?,
     onDone: () -> Unit,
-    onScanAgain: () -> Unit
+    onScanAgain: () -> Unit,
+    scanResults: List<com.example.paisatracker.data.SmsScanResult> = emptyList()
 ) {
+    var showDetails by remember { mutableStateOf(false) }
+    
+    if (showDetails) {
+        ScanResultsDetailScreen(
+            scanResults = scanResults,
+            onBack = { showDetails = false }
+        )
+        return
+    }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -655,6 +671,26 @@ private fun ScanCompletedContent(
         Spacer(modifier = Modifier.weight(1f))
         
         // Action Buttons
+        if (scanResults.isNotEmpty()) {
+            OutlinedButton(
+                onClick = { showDetails = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.List,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("View Detailed Results (${scanResults.size} SMS)")
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        
         Button(
             onClick = onDone,
             modifier = Modifier
@@ -812,5 +848,254 @@ private fun ScanCancelledContent(
         }
     }
 }
+@Composable
+private fun ScanResultsDetailScreen(
+    scanResults: List<com.example.paisatracker.data.SmsScanResult>,
+    onBack: () -> Unit
+) {
+    var filterType by remember { mutableStateOf("All") }
+    
+    val filteredResults = remember(scanResults, filterType) {
+        when (filterType) {
+            "Success" -> scanResults.filter { it.success && !it.isDuplicate }
+            "Failed" -> scanResults.filter { !it.success }
+            "Duplicate" -> scanResults.filter { it.isDuplicate }
+            else -> scanResults
+        }
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Scan Results Details",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${filteredResults.size} of ${scanResults.size} messages",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        // Filter Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = filterType == "All",
+                onClick = { filterType = "All" },
+                label = { Text("All (${scanResults.size})") }
+            )
+            FilterChip(
+                selected = filterType == "Success",
+                onClick = { filterType = "Success" },
+                label = { Text("Success (${scanResults.count { it.success && !it.isDuplicate }})") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                }
+            )
+            FilterChip(
+                selected = filterType == "Failed",
+                onClick = { filterType = "Failed" },
+                label = { Text("Failed (${scanResults.count { !it.success }})") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+            FilterChip(
+                selected = filterType == "Duplicate",
+                onClick = { filterType = "Duplicate" },
+                label = { Text("Duplicate (${scanResults.count { it.isDuplicate }})") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Results List
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(filteredResults) { result ->
+                SmsResultCard(result)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmsResultCard(result: com.example.paisatracker.data.SmsScanResult) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                result.isDuplicate -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                result.success -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = when {
+                            result.isDuplicate -> Icons.Default.Info
+                            result.success -> Icons.Default.CheckCircle
+                            else -> Icons.Default.Close
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = when {
+                            result.isDuplicate -> MaterialTheme.colorScheme.primary
+                            result.success -> Color(0xFF4CAF50)
+                            else -> MaterialTheme.colorScheme.error
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = result.sender,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault())
+                                .format(java.util.Date(result.timestamp)),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Status Badge
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = when {
+                    result.isDuplicate -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    result.success -> Color(0xFF4CAF50).copy(alpha = 0.2f)
+                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                }
+            ) {
+                Text(
+                    text = when {
+                        result.isDuplicate -> "Duplicate"
+                        result.success -> "Parsed Successfully"
+                        else -> "Failed to Parse"
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = when {
+                        result.isDuplicate -> MaterialTheme.colorScheme.primary
+                        result.success -> Color(0xFF4CAF50)
+                        else -> MaterialTheme.colorScheme.error
+                    }
+                )
+            }
+            
+            // Expanded Content
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = "SMS Content:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = result.body,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                )
+                
+                if (result.errorMessage != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Error:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = result.errorMessage,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 // Made with Bob

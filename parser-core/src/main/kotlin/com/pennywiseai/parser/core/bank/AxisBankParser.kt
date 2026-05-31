@@ -73,9 +73,24 @@ class AxisBankParser : BaseIndianBankParser() {
     }
 
     override fun extractMerchant(message: String, sender: String): String? {
+        val lowerMessage = message.lowercase()
+        
+        // Credit/Income transaction patterns (NEFT, IMPS, UPI credits)
+        // Pattern: "credited to A/c no. XX4354 on 31-05-26 by NEFT-SBIN0000691-HARSHAL MALI-N155260531000001"
+        if (lowerMessage.contains("credited to a/c no.") && lowerMessage.contains(" by ")) {
+            val creditByPattern = Regex(
+                """credited to A/c no\. [^\s]+ on [^\s]+ by ([A-Z]+)""",
+                RegexOption.IGNORE_CASE
+            )
+            creditByPattern.find(message)?.let { match ->
+                val transferType = match.groupValues[1].uppercase()
+                // Return the transfer type as merchant (NEFT, IMPS, UPI, etc.)
+                return transferType
+            }
+        }
+        
         // ATM withdrawal detection
         // Pattern: "debited from A/c no. XX589034 on AXIS BANK L" or similar
-        val lowerMessage = message.lowercase()
         if (lowerMessage.contains("debited from a/c no.") &&
             lowerMessage.contains(" on axis bank")) {
             return "ATM"

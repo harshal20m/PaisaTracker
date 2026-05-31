@@ -215,6 +215,49 @@ Not you? SMS BLOCK 6018 to 919951860002""",
                     accountLast4 = "2225",
                     balance = BigDecimal("10000.00")
                 )
+            ),
+
+            // Credit/Income transactions - NEFT/IMPS/UPI credits
+            ParserTestCase(
+                name = "NEFT Credit - User's Specific Case",
+                message = "INR 57739.50 credited to A/c no. XX4354 on 31-05-26 by NEFT-SBIN0000691-HARSHAL MALI-N155260531000001. Avl bal: INR 58739.50. Download Axis Mobile App to manage your account 24x7 - Axis Bank",
+                sender = "AX-AXISBK",
+                expected = ExpectedTransaction(
+                    amount = BigDecimal("57739.50"),
+                    currency = "INR",
+                    type = com.pennywiseai.parser.core.TransactionType.INCOME,
+                    merchant = "NEFT",
+                    accountLast4 = "4354",
+                    balance = BigDecimal("58739.50")
+                )
+            ),
+
+            ParserTestCase(
+                name = "IMPS Credit",
+                message = "INR 5000.00 credited to A/c no. XX1234 on 15-05-26 by IMPS-HDFC0001234-JOHN DOE-I123456789. Avl bal: INR 25000.00 - Axis Bank",
+                sender = "AX-AXISBK",
+                expected = ExpectedTransaction(
+                    amount = BigDecimal("5000.00"),
+                    currency = "INR",
+                    type = com.pennywiseai.parser.core.TransactionType.INCOME,
+                    merchant = "IMPS",
+                    accountLast4 = "1234",
+                    balance = BigDecimal("25000.00")
+                )
+            ),
+
+            ParserTestCase(
+                name = "UPI Credit",
+                message = "INR 1500.00 credited to A/c no. XX5678 on 20-05-26 by UPI-PAYTM-9876543210@paytm. Avl bal: INR 15000.00 - Axis Bank",
+                sender = "AX-AXISBK",
+                expected = ExpectedTransaction(
+                    amount = BigDecimal("1500.00"),
+                    currency = "INR",
+                    type = com.pennywiseai.parser.core.TransactionType.INCOME,
+                    merchant = "UPI",
+                    accountLast4 = "5678",
+                    balance = BigDecimal("15000.00")
+                )
             )
         )
 

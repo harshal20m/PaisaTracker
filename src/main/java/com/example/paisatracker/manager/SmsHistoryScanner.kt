@@ -72,6 +72,7 @@ class SmsHistoryScanner(
             var createdExpenses = 0
             var skippedDuplicates = 0
             var failedMessages = 0
+            val allResults = mutableListOf<SmsScanResult>()
             
             for (batch in messages.chunked(config.batchSize)) {
                 // Check if coroutine is still active
@@ -82,6 +83,7 @@ class SmsHistoryScanner(
                 
                 for (message in batch) {
                     val result = processSmsMessage(message, config.autoCreateExpenses)
+                    allResults.add(result)
                     
                     processedCount++
                     
@@ -122,7 +124,8 @@ class SmsHistoryScanner(
                 createdExpenses = createdExpenses,
                 skippedDuplicates = skippedDuplicates,
                 failedMessages = failedMessages,
-                scanDurationMs = scanDuration
+                scanDurationMs = scanDuration,
+                scanResults = allResults
             ))
             
             Log.d(TAG, "Scan completed: $foundTransactions transactions found, $createdExpenses expenses created, $skippedDuplicates duplicates skipped")
