@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.paisatracker.data.BankNotificationEntity
-import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -69,16 +68,16 @@ fun TrashScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
-                ),
-                windowInsets = WindowInsets(0, 0, 0, 0)  // Removes top gap (status bar insets)
+                )
+                // No custom windowInsets → uses default safe insets (gap under status bar)
             )
         },
         snackbarHost = {
             SnackbarHost(hostState = remember { SnackbarHostState() }) { data ->
                 Snackbar(
                     snackbarData = data,
-                    containerColor = if (errorMessage != null) 
-                        MaterialTheme.colorScheme.errorContainer 
+                    containerColor = if (errorMessage != null)
+                        MaterialTheme.colorScheme.errorContainer
                     else MaterialTheme.colorScheme.primaryContainer
                 )
             }
@@ -173,17 +172,15 @@ fun TrashScreen(
         )
     }
 
-    // Show messages
+    // Optional: handle error/success messages with Snackbar if needed
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
-            // Show snackbar
             viewModel.clearErrorMessage()
         }
     }
 
     LaunchedEffect(successMessage) {
         successMessage?.let {
-            // Show snackbar
             viewModel.clearSuccessMessage()
         }
     }

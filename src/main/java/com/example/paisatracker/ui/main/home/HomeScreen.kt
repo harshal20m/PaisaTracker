@@ -430,65 +430,24 @@ private fun HomeActionGrid(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .widthIn(max = 500.dp)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Summary - Takes full height on left
-            OutlinedCard(
-                onClick = onSummaryClick,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(169.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
-                ),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                )
+            // First Row: Summary and Gallery
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("📊", fontSize = 20.sp)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Summary",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-            
-            // Gallery, Bin, and SMS Trash - Stacked on right
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Gallery
+                // Summary
                 OutlinedCard(
-                    onClick = onAssetsClick,
+                    onClick = onSummaryClick,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(53.dp),
+                        .weight(1f)
+                        .height(116.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.outlinedCardColors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
@@ -498,27 +457,69 @@ private fun HomeActionGrid(
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                     )
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("📊", fontSize = 20.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Summary",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                
+                // Gallery
+                OutlinedCard(
+                    onClick = onAssetsClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(116.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     Icons.Default.Collections,
                                     contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(20.dp),
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "Gallery",
                             style = MaterialTheme.typography.labelLarge,
@@ -527,12 +528,18 @@ private fun HomeActionGrid(
                         )
                     }
                 }
-                
+            }
+            
+            // Second Row: Bin and SMS Trash
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 // Bin
                 OutlinedCard(
                     onClick = onBinClick,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .height(53.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.outlinedCardColors(
@@ -577,7 +584,7 @@ private fun HomeActionGrid(
                 OutlinedCard(
                     onClick = onSmsTrashClick,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f)
                         .height(53.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.outlinedCardColors(
