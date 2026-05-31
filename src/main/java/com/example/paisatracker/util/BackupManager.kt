@@ -30,7 +30,7 @@ class BackupManager(private val context: Context) {
     suspend fun createFullBackup(destinationUri: Uri): BackupMetadata? = withContext(Dispatchers.IO) {
         try {
             // Get database file - MUST match your actual database name
-            val dbPath = context.getDatabasePath("paisa_tracker_database_v1_3").absolutePath
+            val dbPath = context.getDatabasePath("paisa_tracker_database_v2").absolutePath
             val dbFile = File(dbPath)
 
             if (!dbFile.exists()) {
@@ -101,7 +101,7 @@ class BackupManager(private val context: Context) {
                     
                     // Add schema version metadata
                     zipOut.putNextEntry(ZipEntry("schema_version.txt"))
-                    zipOut.write("19".toByteArray()) // Current schema version
+                    zipOut.write("1".toByteArray()) // Current schema version
                     zipOut.closeEntry()
                 }
             }
@@ -147,7 +147,7 @@ class BackupManager(private val context: Context) {
             // Close current database
             database.close()
 
-            val dbPath = context.getDatabasePath("paisa_tracker_database_v1_3").absolutePath
+            val dbPath = context.getDatabasePath("paisa_tracker_database_v2").absolutePath
             val dbFile = File(dbPath)
             val tempDbFile = File(dbPath + ".temp")
             val assetDir = File(context.filesDir, "expense_assets")
@@ -215,34 +215,14 @@ class BackupManager(private val context: Context) {
                 return@withContext false
             }
 
-            // Open database with migrations enabled - Room will automatically run migrations
+            // Open database - no migrations needed since we're at version 1
             try {
                 val restoredDb = Room.databaseBuilder(
                     context.applicationContext,
                     PaisaTrackerDatabase::class.java,
-                    "paisa_tracker_database_v1_3"
+                    "paisa_tracker_database_v2"
                 )
-                    .addMigrations(
-                        PaisaTrackerDatabase.MIGRATION_1_2,
-                        PaisaTrackerDatabase.MIGRATION_2_3,
-                        PaisaTrackerDatabase.MIGRATION_3_4,
-                        PaisaTrackerDatabase.MIGRATION_4_5,
-                        PaisaTrackerDatabase.MIGRATION_5_6,
-                        PaisaTrackerDatabase.MIGRATION_6_7,
-                        PaisaTrackerDatabase.MIGRATION_7_8,
-                        PaisaTrackerDatabase.MIGRATION_8_9,
-                        PaisaTrackerDatabase.MIGRATION_9_10,
-                        PaisaTrackerDatabase.MIGRATION_10_11,
-                        PaisaTrackerDatabase.MIGRATION_11_12,
-                        PaisaTrackerDatabase.MIGRATION_12_13,
-                        PaisaTrackerDatabase.MIGRATION_13_14,
-                        PaisaTrackerDatabase.MIGRATION_14_15,
-                        PaisaTrackerDatabase.MIGRATION_15_16,
-                        PaisaTrackerDatabase.MIGRATION_16_17,
-                        PaisaTrackerDatabase.MIGRATION_17_18,
-                        PaisaTrackerDatabase.MIGRATION_18_19
-                    )
-                    .fallbackToDestructiveMigration(false) // Don't destroy data
+                    .fallbackToDestructiveMigration() // Allow destructive migration for fresh start
                     .build()
 
                 // Force database to open and run migrations

@@ -4,8 +4,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
+
 @Database(
     entities = [
         Project::class,
@@ -22,7 +21,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UnrecognizedSmsEntity::class,
         MerchantRuleEntity::class,
     ],
-    version = 19,
+    version = 1,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,526 +39,49 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
     abstract fun bankNotificationDao(): BankNotificationDao
     abstract fun unrecognizedSmsDao(): UnrecognizedSmsDao
     abstract fun merchantRuleDao(): MerchantRuleDao
+    
     companion object {
         @Volatile
         private var INSTANCE: PaisaTrackerDatabase? = null
+        
         fun getDatabase(context: Context): PaisaTrackerDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     PaisaTrackerDatabase::class.java,
-                    "paisa_tracker_database_v1_3"  // Changed database name to force fresh start
+                    "paisa_tracker_database_v2"  // New database name for fresh start
                 )
-                    .addMigrations(
-                        MIGRATION_1_2,
-                        MIGRATION_2_3,
-                        MIGRATION_3_4,
-                        MIGRATION_4_5,
-                        MIGRATION_5_6,
-                        MIGRATION_6_7,
-                        MIGRATION_7_8,
-                        MIGRATION_8_9,
-                        MIGRATION_9_10,
-                        MIGRATION_10_11,
-                        MIGRATION_11_12,
-                        MIGRATION_12_13,
-                        MIGRATION_13_14,
-                        MIGRATION_14_15,
-                        MIGRATION_15_16,
-                        MIGRATION_16_17,
-                        MIGRATION_17_18,
-                        MIGRATION_18_19
-                    )
-                    .fallbackToDestructiveMigration(true)  // Temporarily enabled to fix migration issue
+                    .fallbackToDestructiveMigration()  // Allow destructive migration for fresh start
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
-        val MIGRATION_14_15 = object : Migration(14, 15) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Create bank_notifications table for SMS transaction detection
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `bank_notifications` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `package_name` TEXT NOT NULL,
-                        `sender_alias` TEXT NOT NULL,
-                        `message_body` TEXT NOT NULL,
-                        `message_hash` TEXT NOT NULL,
-                        `posted_at` TEXT NOT NULL,
-                        `processed` INTEGER NOT NULL DEFAULT 0,
-                        `transaction_id` INTEGER,
-                        `created_at` TEXT NOT NULL
-                    )
-                """)
-                
-                // Create unique index on package_name and message_hash
-                db.execSQL("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS `index_bank_notifications_package_name_message_hash`
-                    ON `bank_notifications` (`package_name`, `message_hash`)
-                """)
-                
-                // Create unrecognized_sms table for storing unrecognized financial SMS
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `unrecognized_sms` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `sender` TEXT NOT NULL,
-                        `sms_body` TEXT NOT NULL,
-                        `received_at` TEXT NOT NULL,
-                        `reported` INTEGER NOT NULL DEFAULT 0,
-                        `is_deleted` INTEGER NOT NULL DEFAULT 0,
-                        `created_at` TEXT NOT NULL
-                    )
-                """)
-                
-                // Create unique index on sender and sms_body
-                db.execSQL("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS `index_unrecognized_sms_sender_sms_body`
-                    ON `unrecognized_sms` (`sender`, `sms_body`)
-                """)
-            }
-        }
         
-        val MIGRATION_15_16 = object : Migration(15, 16) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add new columns to bank_notifications table for SMS confirmation UI
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN status TEXT NOT NULL DEFAULT 'PENDING'")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN amount REAL")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN merchant TEXT")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN bank_name TEXT")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN account_last4 TEXT")
-                
-                // Create index on status for efficient querying of pending transactions
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_bank_notifications_status`
-                    ON `bank_notifications` (`status`)
-                """)
-                
-                // Update existing records to AUTO_CREATED status if they have a transaction_id
-                db.execSQL("""
-                    UPDATE bank_notifications
-                    SET status = 'AUTO_CREATED'
-                    WHERE transaction_id IS NOT NULL
-                """)
-            }
-        }
-        
-        val MIGRATION_16_17 = object : Migration(16, 17) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add trash-related columns to bank_notifications table
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN rejected_at TEXT")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN deletion_scheduled_at TEXT")
-                db.execSQL("ALTER TABLE bank_notifications ADD COLUMN trash_retention_days INTEGER")
-                
-                // Create index on deletion_scheduled_at for efficient cleanup queries
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_bank_notifications_deletion_scheduled_at`
-                    ON `bank_notifications` (`deletion_scheduled_at`)
-                """)
-            }
-        }
-
-        val MIGRATION_17_18 = object : Migration(17, 18) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Create merchant_rules table for auto-categorization
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `merchant_rules` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `merchant_pattern` TEXT NOT NULL,
-                        `category_id` INTEGER NOT NULL,
-                        `project_id` INTEGER,
-                        `priority` INTEGER NOT NULL DEFAULT 0,
-                        `is_active` INTEGER NOT NULL DEFAULT 1,
-                        `match_count` INTEGER NOT NULL DEFAULT 0,
-                        `last_matched_at` TEXT,
-                        `created_at` TEXT NOT NULL
-                    )
-                """)
-                
-                // Create unique index on merchant_pattern
-                db.execSQL("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS `index_merchant_rules_merchant_pattern`
-                    ON `merchant_rules` (`merchant_pattern`)
-                """)
-                
-                // Create index on priority for efficient sorting
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_merchant_rules_priority`
-                    ON `merchant_rules` (`priority`)
-                """)
-                
-                // Create index on is_active for filtering
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_merchant_rules_is_active`
-                    ON `merchant_rules` (`is_active`)
-                """)
-            }
-        }
-
-        val MIGRATION_18_19 = object : Migration(18, 19) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Fix bank_notifications and unrecognized_sms tables
-                // Change INTEGER columns to TEXT for LocalDateTime
-                
-                // ===== Fix bank_notifications table =====
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `bank_notifications_new` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `package_name` TEXT NOT NULL,
-                        `sender_alias` TEXT NOT NULL,
-                        `message_body` TEXT NOT NULL,
-                        `message_hash` TEXT NOT NULL,
-                        `posted_at` TEXT NOT NULL,
-                        `processed` INTEGER NOT NULL DEFAULT 0,
-                        `transaction_id` INTEGER,
-                        `created_at` TEXT NOT NULL,
-                        `status` TEXT NOT NULL DEFAULT 'PENDING',
-                        `amount` REAL,
-                        `merchant` TEXT,
-                        `bank_name` TEXT,
-                        `account_last4` TEXT,
-                        `rejected_at` TEXT,
-                        `deletion_scheduled_at` TEXT,
-                        `trash_retention_days` INTEGER
-                    )
-                """)
-                
-                db.execSQL("""
-                    INSERT INTO bank_notifications_new
-                    SELECT
-                        id,
-                        package_name,
-                        sender_alias,
-                        message_body,
-                        message_hash,
-                        CASE
-                            WHEN typeof(posted_at) = 'integer' THEN datetime(posted_at / 1000, 'unixepoch')
-                            ELSE posted_at
-                        END as posted_at,
-                        processed,
-                        transaction_id,
-                        CASE
-                            WHEN typeof(created_at) = 'integer' THEN datetime(created_at / 1000, 'unixepoch')
-                            ELSE created_at
-                        END as created_at,
-                        status,
-                        amount,
-                        merchant,
-                        bank_name,
-                        account_last4,
-                        rejected_at,
-                        deletion_scheduled_at,
-                        trash_retention_days
-                    FROM bank_notifications
-                """)
-                
-                db.execSQL("DROP TABLE bank_notifications")
-                db.execSQL("ALTER TABLE bank_notifications_new RENAME TO bank_notifications")
-                
-                db.execSQL("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS `index_bank_notifications_package_name_message_hash`
-                    ON `bank_notifications` (`package_name`, `message_hash`)
-                """)
-                
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_bank_notifications_status`
-                    ON `bank_notifications` (`status`)
-                """)
-                
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_bank_notifications_deletion_scheduled_at`
-                    ON `bank_notifications` (`deletion_scheduled_at`)
-                """)
-                
-                // ===== Fix unrecognized_sms table =====
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `unrecognized_sms_new` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `sender` TEXT NOT NULL,
-                        `sms_body` TEXT NOT NULL,
-                        `received_at` TEXT NOT NULL,
-                        `reported` INTEGER NOT NULL DEFAULT 0,
-                        `is_deleted` INTEGER NOT NULL DEFAULT 0,
-                        `created_at` TEXT NOT NULL
-                    )
-                """)
-                
-                db.execSQL("""
-                    INSERT INTO unrecognized_sms_new
-                    SELECT
-                        id,
-                        sender,
-                        sms_body,
-                        CASE
-                            WHEN typeof(received_at) = 'integer' THEN datetime(received_at / 1000, 'unixepoch')
-                            ELSE received_at
-                        END as received_at,
-                        reported,
-                        is_deleted,
-                        CASE
-                            WHEN typeof(created_at) = 'integer' THEN datetime(created_at / 1000, 'unixepoch')
-                            ELSE created_at
-                        END as created_at
-                    FROM unrecognized_sms
-                """)
-                
-                db.execSQL("DROP TABLE unrecognized_sms")
-                db.execSQL("ALTER TABLE unrecognized_sms_new RENAME TO unrecognized_sms")
-                
-                db.execSQL("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS `index_unrecognized_sms_sender_sms_body`
-                    ON `unrecognized_sms` (`sender`, `sms_body`)
-                """)
-                
-                // ===== Fix merchant_rules table - add missing is_active index =====
-                db.execSQL("""
-                    CREATE INDEX IF NOT EXISTS `index_merchant_rules_is_active`
-                    ON `merchant_rules` (`is_active`)
-                """)
-            }
-        }
-
-        val MIGRATION_13_14 = object : Migration(13, 14) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add new columns for multi-salary support
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN linkedAccountId INTEGER NOT NULL DEFAULT 0"
-                )
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN sourceType TEXT NOT NULL DEFAULT 'PRIMARY'"
-                )
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN sourceName TEXT NOT NULL DEFAULT ''"
-                )
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1"
-                )
-                
-                // Migrate existing recurringAccountId to linkedAccountId
-                db.execSQL("""
-                    UPDATE salary_records
-                    SET linkedAccountId = COALESCE(recurringAccountId, 0)
-                    WHERE recurringAccountId IS NOT NULL
-                """)
-            }
-        }
-
-        val MIGRATION_12_13 = object : Migration(12, 13) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN isRecurring INTEGER NOT NULL DEFAULT 0"
-                )
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN recurringAccountId INTEGER"
-                )
-                db.execSQL(
-                    "ALTER TABLE salary_records ADD COLUMN autoGenerated INTEGER NOT NULL DEFAULT 0"
-                )
-            }
-        }
-
-        val MIGRATION_11_12 = object : Migration(11, 12) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Step 1: Create bank_accounts table
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `bank_accounts` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `name` TEXT NOT NULL,
-                        `accountType` TEXT NOT NULL,
-                        `bankName` TEXT,
-                        `initialBalance` REAL NOT NULL DEFAULT 0.0,
-                        `currentBalance` REAL NOT NULL DEFAULT 0.0,
-                        `emoji` TEXT NOT NULL DEFAULT '🏦',
-                        `colorHex` TEXT NOT NULL DEFAULT '#2196F3',
-                        `isActive` INTEGER NOT NULL DEFAULT 1,
-                        `createdAt` INTEGER NOT NULL,
-                        `updatedAt` INTEGER NOT NULL
-                    )
-                """)
-                
-                // Step 2: Create new expenses table with foreign key
-                db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS `expenses_new` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `amount` REAL NOT NULL,
-                        `date` INTEGER NOT NULL,
-                        `description` TEXT NOT NULL,
-                        `categoryId` INTEGER NOT NULL,
-                        `assetPath` TEXT,
-                        `paymentMethod` TEXT,
-                        `paymentIcon` TEXT,
-                        `bankAccountId` INTEGER,
-                        FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON DELETE CASCADE,
-                        FOREIGN KEY(`bankAccountId`) REFERENCES `bank_accounts`(`id`) ON DELETE SET NULL
-                    )
-                """)
-                
-                // Step 3: Copy data from old table to new table
-                db.execSQL("""
-                    INSERT INTO expenses_new (id, amount, date, description, categoryId, assetPath, paymentMethod, paymentIcon)
-                    SELECT id, amount, date, description, categoryId, assetPath, paymentMethod, paymentIcon
-                    FROM expenses
-                """)
-                
-                // Step 4: Drop old table
-                db.execSQL("DROP TABLE expenses")
-                
-                // Step 5: Rename new table to expenses
-                db.execSQL("ALTER TABLE expenses_new RENAME TO expenses")
-                
-                // Step 6: Recreate indices
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_categoryId ON expenses(categoryId)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_bankAccountId ON expenses(bankAccountId)")
-            }
-        }
-        
-        val MIGRATION_10_11 = object : Migration(10, 11) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Add includeInSalary column to projects table with default value true
-                db.execSQL("ALTER TABLE projects ADD COLUMN includeInSalary INTEGER NOT NULL DEFAULT 1")
-            }
-        }
-        
-        val MIGRATION_9_10 = object : Migration(9, 10) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `action_history` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `actionType` TEXT NOT NULL,
-                        `entityType` TEXT NOT NULL,
-                        `entityData` TEXT NOT NULL,
-                        `timestamp` INTEGER NOT NULL
-                    )
-                    """.trimIndent()
-                )
-            }
-        }
-        val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS backup_metadata (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        fileName TEXT NOT NULL,
-                        filePath TEXT NOT NULL,
-                        fileSize INTEGER NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        projectCount INTEGER NOT NULL,
-                        categoryCount INTEGER NOT NULL,
-                        expenseCount INTEGER NOT NULL,
-                        totalAmount REAL NOT NULL
-                    )
-                    """.trimIndent()
-                )
-            }
-        }
-        val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE assets ADD COLUMN expenseId INTEGER DEFAULT NULL")
-                db.execSQL("ALTER TABLE categories ADD COLUMN emoji TEXT NOT NULL DEFAULT '▶️'")
-                db.execSQL("ALTER TABLE expenses ADD COLUMN paymentMethod TEXT DEFAULT NULL")
-                db.execSQL("ALTER TABLE expenses ADD COLUMN paymentIcon TEXT DEFAULT NULL")
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS budgets (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        name TEXT NOT NULL,
-                        emoji TEXT NOT NULL DEFAULT '💰',
-                        limitAmount REAL NOT NULL,
-                        period TEXT NOT NULL,
-                        categoryId INTEGER,
-                        projectId INTEGER,
-                        createdAt INTEGER NOT NULL,
-                        isActive INTEGER NOT NULL DEFAULT 1
-                    )
-                    """.trimIndent()
-                )
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `flap_data` (
-                        `id` INTEGER NOT NULL PRIMARY KEY,
-                        `notesText` TEXT NOT NULL DEFAULT '',
-                        `calcHistorySerialized` TEXT NOT NULL DEFAULT '',
-                        `calcDisplay` TEXT NOT NULL DEFAULT '0',
-                        `calcExpression` TEXT NOT NULL DEFAULT '',
-                        `lastUpdatedAt` INTEGER NOT NULL
-                    )
-                    """.trimIndent()
-                )
-            }
-        }
-        
-        val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Migration 3 to 4 - Add salary records table
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `salary_records` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `amount` REAL NOT NULL,
-                        `month` INTEGER NOT NULL,
-                        `year` INTEGER NOT NULL,
-                        `receivedAt` INTEGER NOT NULL,
-                        `notes` TEXT NOT NULL DEFAULT ''
-                    )
-                    """.trimIndent()
-                )
-            }
-        }
-        
-        val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `upi_transactions` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `expenseId` INTEGER NOT NULL,
-                        `vpa` TEXT NOT NULL,
-                        `payeeName` TEXT NOT NULL,
-                        `amount` REAL NOT NULL,
-                        `transactionNote` TEXT NOT NULL DEFAULT '',
-                        `status` TEXT NOT NULL DEFAULT 'PENDING',
-                        `transactionId` TEXT,
-                        `responseCode` TEXT,
-                        `rawResponse` TEXT,
-                        `createdAt` INTEGER NOT NULL,
-                        `updatedAt` INTEGER NOT NULL,
-                        FOREIGN KEY(`expenseId`) REFERENCES `expenses`(`id`) ON DELETE CASCADE
-                    )
-                    """.trimIndent()
-                )
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_upi_transactions_expenseId` ON `upi_transactions` (`expenseId`)")
-            }
-        }
-        
-        val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                // Migration 5 to 6 - No schema changes, just version bump
-                // This was likely used for data seeding or other non-schema changes
-            }
-        }
-        
-        val MIGRATION_6_7 = object : Migration(6, 7) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("DROP TABLE IF EXISTS `upi_transactions`")
-                db.execSQL("DROP TABLE IF EXISTS `pending_transactions`")
-            }
-        }
-        val MIGRATION_7_8 = object : Migration(7, 8) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "ALTER TABLE budgets ADD COLUMN trackingStartAt INTEGER NOT NULL DEFAULT 0"
-                )
-                db.execSQL(
-                    "UPDATE budgets SET trackingStartAt = createdAt WHERE trackingStartAt = 0"
-                )
-            }
-        }
-        val MIGRATION_8_9 = object : Migration(8, 9) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("ALTER TABLE projects ADD COLUMN isCompleted INTEGER NOT NULL DEFAULT 0")
-            }
-        }
+        // ============================================================================
+        // ALL MIGRATIONS REMOVED - STARTING FRESH WITH VERSION 1
+        // ============================================================================
+        // 
+        // ⚠️ WARNING: This will cause data loss for existing users!
+        // 
+        // This approach is ONLY suitable if:
+        // 1. App is not yet released to production
+        // 2. You can afford to lose all test data
+        // 3. No users depend on the app
+        // 4. You're in active development phase
+        //
+        // When users update the app:
+        // - Room will detect schema mismatch
+        // - fallbackToDestructiveMigration() will DROP all tables
+        // - All data will be PERMANENTLY DELETED
+        // - Fresh database will be created with version 1 schema
+        //
+        // Database name changed from "paisa_tracker_database_v1_3" to 
+        // "paisa_tracker_database_v2" to force fresh start on all devices.
+        //
+        // Previous migrations (1-19) have been removed to simplify codebase.
+        // ============================================================================
     }
 }
+
+// Made with Bob
