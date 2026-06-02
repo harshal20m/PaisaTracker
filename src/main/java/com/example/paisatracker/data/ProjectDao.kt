@@ -31,10 +31,10 @@ interface ProjectDao {
     suspend fun updateProjectStatus(projectId: Long, isCompleted: Boolean)
 
     @Query("""
-    SELECT p.*, 
-           COALESCE(SUM(e.amount), 0) as totalAmount,
+    SELECT p.*,
+           COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0) as totalAmount,
            COUNT(DISTINCT c.id) as categoryCount,
-           COUNT(DISTINCT e.id) as expenseCount
+           COUNT(DISTINCT CASE WHEN e.amount > 0 THEN e.id END) as expenseCount
     FROM projects p
     LEFT JOIN categories c ON c.projectId = p.id
     LEFT JOIN expenses e ON e.categoryId = c.id
@@ -45,10 +45,10 @@ interface ProjectDao {
     fun getActiveProjectsWithTotal(): Flow<List<ProjectWithTotal>>
 
     @Query("""
-    SELECT p.*, 
-           COALESCE(SUM(e.amount), 0) as totalAmount,
+    SELECT p.*,
+           COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0) as totalAmount,
            COUNT(DISTINCT c.id) as categoryCount,
-           COUNT(DISTINCT e.id) as expenseCount
+           COUNT(DISTINCT CASE WHEN e.amount > 0 THEN e.id END) as expenseCount
     FROM projects p
     LEFT JOIN categories c ON c.projectId = p.id
     LEFT JOIN expenses e ON e.categoryId = c.id
@@ -60,7 +60,7 @@ interface ProjectDao {
 
 
     @Query("""
-        SELECT c.name as categoryName, COALESCE(SUM(e.amount), 0.0) as totalAmount
+        SELECT c.name as categoryName, COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) as totalAmount
         FROM categories c
         LEFT JOIN expenses e ON c.id = e.categoryId
         WHERE c.projectId = :projectId

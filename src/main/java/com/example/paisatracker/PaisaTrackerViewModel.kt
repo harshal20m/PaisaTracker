@@ -511,6 +511,8 @@ class PaisaTrackerViewModel(
     fun getCompletedProjectsWithTotal(): Flow<List<ProjectWithTotal>> = repository.getCompletedProjectsWithTotal()
     fun getCategoryExpenses(projectId: Long): Flow<List<CategoryExpense>> = repository.getCategoryExpenses(projectId)
     fun getExpenseById(id: Long): Flow<Expense?> = repository.getExpenseById(id)
+    fun getRelatedExpenses(expenseId: Long, description: String, amount: Double, limit: Int = 5): Flow<List<RecentExpense>> =
+        repository.getRelatedExpenses(expenseId, description, amount, amountTolerance = 10.0, limit = limit)
     fun getAllCategories(): Flow<List<Category>> = repository.getAllCategories()
     fun getCategoriesWithTotalForProject(projectId: Long): Flow<List<CategoryWithTotal>> =
         repository.getCategoriesWithTotalForProject(projectId)

@@ -166,7 +166,16 @@ private fun RecentGridTile(expense: RecentExpense, onClick: () -> Unit, modifier
                         Text(expense.categoryName.ifBlank { "Other" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text(formatCurrency(expense.amount), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    val isCredit = expense.amount < 0
+                    val displayAmount = kotlin.math.abs(expense.amount)
+                    val prefix = if (isCredit) "+" else ""
+                    Text(
+                        prefix + formatCurrency(displayAmount),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (isCredit) androidx.compose.ui.graphics.Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
@@ -230,7 +239,16 @@ fun SearchResultItemCard(expense: RecentExpense, onClick: () -> Unit, modifier: 
                         Text(expense.categoryName.ifBlank { "Other" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text(formatCurrency(expense.amount), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                    val isCredit = expense.amount < 0
+                    val displayAmount = kotlin.math.abs(expense.amount)
+                    val prefix = if (isCredit) "+" else ""
+                    Text(
+                        prefix + formatCurrency(displayAmount),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (isCredit) androidx.compose.ui.graphics.Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }

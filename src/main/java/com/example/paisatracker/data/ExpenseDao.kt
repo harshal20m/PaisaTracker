@@ -90,10 +90,10 @@ interface ExpenseDao {
 """)
     suspend fun getExportRows(projectId: Long? = null): List<ExportRow>
 
-    @Query("SELECT COUNT(*) FROM expenses")
+    @Query("SELECT COUNT(*) FROM expenses WHERE amount > 0")
     suspend fun getExpenseCount(): Int
 
-    @Query("SELECT SUM(amount) FROM expenses")
+    @Query("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0.0) FROM expenses")
     suspend fun getTotalAmount(): Double?
 
     @Query("""
@@ -253,6 +253,7 @@ interface ExpenseDao {
     /**
      * Get monthly aggregated totals for the last N months.
      * Returns month in format "YYYY-MM", total amount, and count of expenses.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param months Number of months to retrieve (default 12)
      * @return Flow of monthly totals
@@ -260,8 +261,8 @@ interface ExpenseDao {
     @Query("""
         SELECT
             strftime('%Y-%m', date/1000, 'unixepoch') as month,
-            SUM(e.amount) as total,
-            COUNT(*) as count
+            SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) as total,
+            COUNT(CASE WHEN e.amount > 0 THEN 1 END) as count
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -275,14 +276,15 @@ interface ExpenseDao {
     /**
      * Get yearly aggregated totals for all years with expenses.
      * Returns year, total amount, and count of expenses.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @return Flow of yearly totals
      */
     @Query("""
         SELECT
             strftime('%Y', date/1000, 'unixepoch') as year,
-            SUM(e.amount) as total,
-            COUNT(*) as count
+            SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) as total,
+            COUNT(CASE WHEN e.amount > 0 THEN 1 END) as count
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -295,6 +297,7 @@ interface ExpenseDao {
     /**
      * Get category-wise spending for a specific date range.
      * Includes category details and aggregated amounts.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param startDate Start timestamp (inclusive)
      * @param endDate End timestamp (inclusive)
@@ -305,8 +308,8 @@ interface ExpenseDao {
             c.id as categoryId,
             c.name as categoryName,
             c.emoji as categoryIcon,
-            SUM(e.amount) as total,
-            COUNT(e.id) as count,
+            SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) as total,
+            COUNT(CASE WHEN e.amount > 0 THEN 1 END) as count,
             0.0 as percentage
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
@@ -314,6 +317,7 @@ interface ExpenseDao {
         WHERE e.date BETWEEN :startDate AND :endDate
         AND p.isCompleted = 0
         GROUP BY c.id, c.name, c.emoji
+        HAVING total > 0
         ORDER BY total DESC
     """)
     fun getCategorySpendingByDateRange(
@@ -324,13 +328,14 @@ interface ExpenseDao {
     /**
      * Get total spending for a specific date range.
      * Used for calculating overall spending in a time period.
+     * Only sums positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param startDate Start timestamp (inclusive)
      * @param endDate End timestamp (inclusive)
      * @return Total amount spent, or 0.0 if no expenses
      */
     @Query("""
-        SELECT COALESCE(SUM(e.amount), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0)
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -342,6 +347,7 @@ interface ExpenseDao {
     /**
      * Get expense count for a specific date range.
      * Used for analytics and statistics.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param startDate Start timestamp (inclusive)
      * @param endDate End timestamp (inclusive)
@@ -353,6 +359,7 @@ interface ExpenseDao {
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
         WHERE e.date BETWEEN :startDate AND :endDate
+        AND e.amount > 0
         AND p.isCompleted = 0
     """)
     suspend fun getCountByDateRange(startDate: Long, endDate: Long): Int
@@ -360,6 +367,7 @@ interface ExpenseDao {
     /**
      * Get monthly totals for a specific year.
      * Returns all 12 months with their totals (0 if no expenses).
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param year Year to query (e.g., 2024)
      * @return Flow of monthly totals for the year
@@ -367,8 +375,8 @@ interface ExpenseDao {
     @Query("""
         SELECT
             strftime('%Y-%m', date/1000, 'unixepoch') as month,
-            SUM(e.amount) as total,
-            COUNT(*) as count
+            SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) as total,
+            COUNT(CASE WHEN e.amount > 0 THEN 1 END) as count
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -382,6 +390,7 @@ interface ExpenseDao {
     /**
      * Get top N categories by spending in a date range.
      * Useful for "Top Spending Categories" analytics.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param startDate Start timestamp (inclusive)
      * @param endDate End timestamp (inclusive)
@@ -393,8 +402,8 @@ interface ExpenseDao {
             c.id as categoryId,
             c.name as categoryName,
             c.emoji as categoryIcon,
-            SUM(e.amount) as total,
-            COUNT(e.id) as count,
+            SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) as total,
+            COUNT(CASE WHEN e.amount > 0 THEN 1 END) as count,
             0.0 as percentage
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
@@ -402,6 +411,7 @@ interface ExpenseDao {
         WHERE e.date BETWEEN :startDate AND :endDate
         AND p.isCompleted = 0
         GROUP BY c.id, c.name, c.emoji
+        HAVING total > 0
         ORDER BY total DESC
         LIMIT :limit
     """)
@@ -414,6 +424,7 @@ interface ExpenseDao {
     /**
      * Get average daily spending for a date range.
      * Useful for "Daily Average" analytics.
+     * Only counts positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param startDate Start timestamp (inclusive)
      * @param endDate End timestamp (inclusive)
@@ -421,7 +432,7 @@ interface ExpenseDao {
      */
     @Query("""
         SELECT
-            COALESCE(SUM(e.amount) /
+            COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END) /
                 (CAST(((:endDate - :startDate) / 86400000) AS REAL) + 1), 0.0)
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
@@ -439,6 +450,7 @@ interface ExpenseDao {
     /**
      * Get total spending for a specific category within a date range.
      * Used for category-specific budget tracking.
+     * Only sums positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param categoryId Category ID to filter by
      * @param startDate Start timestamp (inclusive)
@@ -446,7 +458,7 @@ interface ExpenseDao {
      * @return Total amount spent in the category
      */
     @Query("""
-        SELECT COALESCE(SUM(e.amount), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0)
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -463,6 +475,7 @@ interface ExpenseDao {
     /**
      * Get total spending for a specific project within a date range.
      * Used for project-specific budget tracking.
+     * Only sums positive amounts (debits/expenses), excludes negative amounts (credits).
      *
      * @param projectId Project ID to filter by
      * @param startDate Start timestamp (inclusive)
@@ -470,7 +483,7 @@ interface ExpenseDao {
      * @return Total amount spent in the project
      */
     @Query("""
-        SELECT COALESCE(SUM(e.amount), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0)
         FROM expenses e
         INNER JOIN categories c ON e.categoryId = c.id
         INNER JOIN projects p ON c.projectId = p.id
@@ -518,4 +531,55 @@ interface ExpenseDao {
         endTime: Long,
         description: String
     ): Expense?
+
+    /**
+     * Get related expenses based on similar description or amount
+     * Used in ExpenseDetailScreen to show similar transactions
+     *
+     * @param expenseId Current expense ID to exclude
+     * @param description Description to match (merchant name)
+     * @param amount Amount to find similar transactions
+     * @param amountTolerance Tolerance for amount matching (default 10%)
+     * @param limit Maximum number of related expenses to return
+     * @return Flow of related expenses with category and project info
+     */
+    @Query("""
+        SELECT
+            e.id,
+            e.amount,
+            e.description,
+            e.date,
+            e.paymentMethod,
+            e.paymentIcon,
+            p.id as projectId,
+            p.name as projectName,
+            p.emoji as projectEmoji,
+            c.id as categoryId,
+            c.name as categoryName,
+            c.emoji as categoryEmoji
+        FROM expenses e
+        INNER JOIN categories c ON e.categoryId = c.id
+        INNER JOIN projects p ON c.projectId = p.id
+        WHERE e.id != :expenseId
+        AND p.isCompleted = 0
+        AND (
+            e.description LIKE '%' || :description || '%'
+            OR ABS(e.amount - :amount) <= (:amount * :amountTolerance / 100.0)
+        )
+        ORDER BY
+            CASE
+                WHEN e.description LIKE '%' || :description || '%' THEN 0
+                ELSE 1
+            END,
+            ABS(e.amount - :amount) ASC,
+            e.date DESC
+        LIMIT :limit
+    """)
+    fun getRelatedExpenses(
+        expenseId: Long,
+        description: String,
+        amount: Double,
+        amountTolerance: Double = 10.0,
+        limit: Int = 5
+    ): Flow<List<RecentExpense>>
 }

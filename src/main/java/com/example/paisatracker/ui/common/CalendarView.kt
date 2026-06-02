@@ -89,7 +89,7 @@ fun CalendarTransactionView(
             
             MonthData(
                 month = cal,
-                total = monthExpenses.sumOf { it.amount },
+                total = monthExpenses.sumOf { if (it.amount > 0) it.amount else 0.0 },
                 transactionCount = monthExpenses.size
             )
         }.sortedByDescending { it.month.timeInMillis }
@@ -97,7 +97,7 @@ fun CalendarTransactionView(
 
     val selectedDateKey = "${selectedDate.get(Calendar.YEAR)}-${selectedDate.get(Calendar.MONTH)}-${selectedDate.get(Calendar.DAY_OF_MONTH)}"
     val selectedExpenses = expensesByDate[selectedDateKey] ?: emptyList()
-    val dailyTotal = selectedExpenses.sumOf { it.amount }
+    val dailyTotal = selectedExpenses.sumOf { if (it.amount > 0) it.amount else 0.0 }
     val hasExpenses = selectedExpenses.isNotEmpty()
 
     val listState = rememberLazyListState()
@@ -251,7 +251,7 @@ fun CalendarTransactionView(
                                             )
                                         }
                                         Text(
-                                            text = formatCurrency(projectExpenses.sumOf { it.amount }),
+                                            text = formatCurrency(projectExpenses.sumOf { if (it.amount > 0) it.amount else 0.0 }),
                                             style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Bold
@@ -770,7 +770,7 @@ private fun CompactDateCell(
     val dateKey = "${date.get(Calendar.YEAR)}-${date.get(Calendar.MONTH)}-${date.get(Calendar.DAY_OF_MONTH)}"
     val dayExpenses = expensesByDate[dateKey] ?: emptyList()
     val hasDayExpenses = dayExpenses.isNotEmpty()
-    val dayTotal = dayExpenses.sumOf { it.amount }
+    val dayTotal = dayExpenses.sumOf { if (it.amount > 0) it.amount else 0.0 }
 
     val isToday = date.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
             date.get(Calendar.MONTH) == today.get(Calendar.MONTH) &&

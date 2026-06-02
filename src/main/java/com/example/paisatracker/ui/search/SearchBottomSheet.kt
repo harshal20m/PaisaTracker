@@ -349,11 +349,21 @@ private fun SearchResultCard(
                 }
             }
 
+            // Show credits in green with + prefix
+            val isCredit = expense.amount < 0
+            val displayAmount = kotlin.math.abs(expense.amount)
+            val prefix = if (isCredit) "+" else ""
+            
             Text(
-                formatCurrency(expense.amount),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
+                text = prefix + formatCurrency(displayAmount),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
             )
         }
     }

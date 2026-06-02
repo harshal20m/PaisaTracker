@@ -459,16 +459,28 @@ private fun ModernExpenseCard(expense: RecentExpense) {
                     }
                 }
 
-                // Amount
+                // Amount - show credits in green with + prefix
+                val isCredit = expense.amount < 0
+                val displayAmount = kotlin.math.abs(expense.amount)
+                val prefix = if (isCredit) "+" else ""
+                
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    color = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.15f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    }
                 ) {
                     Text(
-                        text = formatCurrency(expense.amount),
+                        text = prefix + formatCurrency(displayAmount),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (isCredit) {
+                            androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                 }

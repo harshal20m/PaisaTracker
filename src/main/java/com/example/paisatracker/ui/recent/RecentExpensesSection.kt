@@ -122,7 +122,21 @@ private fun CompactRecentExpenseGridCard(expense: RecentExpense) {
                 Text(formatDateShort(expense.date), style = MaterialTheme.typography.labelSmall, fontSize = 9.sp)
             }
 
-            Text(formatCurrency(expense.amount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
+            // Show credits in green with + prefix
+            val isCredit = expense.amount < 0
+            val displayAmount = kotlin.math.abs(expense.amount)
+            val prefix = if (isCredit) "+" else ""
+            
+            Text(
+                prefix + formatCurrency(displayAmount),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isCredit) {
+                    androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                } else {
+                    MaterialTheme.colorScheme.primary
+                }
+            )
             Text(expense.description, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {

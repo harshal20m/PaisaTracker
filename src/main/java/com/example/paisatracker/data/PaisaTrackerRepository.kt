@@ -620,6 +620,27 @@ class PaisaTrackerRepository(
     }
 
     /**
+     * Get related expenses based on similar description or amount.
+     * Used in ExpenseDetailScreen to show similar transactions.
+     *
+     * @param expenseId Current expense ID to exclude
+     * @param description Description to match (merchant name)
+     * @param amount Amount to find similar transactions
+     * @param amountTolerance Tolerance for amount matching (default 10%)
+     * @param limit Maximum number of related expenses to return
+     * @return Flow of related expenses
+     */
+    fun getRelatedExpenses(
+        expenseId: Long,
+        description: String,
+        amount: Double,
+        amountTolerance: Double = 10.0,
+        limit: Int = 5
+    ): Flow<List<RecentExpense>> {
+        return expenseDao.getRelatedExpenses(expenseId, description, amount, amountTolerance, limit)
+    }
+
+    /**
      * Calculate savings for a period.
      * Savings = Income (Salary) - Expenses
      *

@@ -1066,11 +1066,20 @@ fun ExpenseListItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Show credits in green with + prefix, debits in primary color
+                val isCredit = expense.amount < 0
+                val displayAmount = kotlin.math.abs(expense.amount)
+                val prefix = if (isCredit) "+" else ""
+                
                 Text(
-                    text = formatCurrency(expense.amount),
+                    text = prefix + formatCurrency(displayAmount),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green for credits
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
                 )
 
                 Box {
@@ -1238,11 +1247,20 @@ fun ExpenseGridItem(
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                // Show credits in green with + prefix, debits in primary color
+                val isCredit = expense.amount < 0
+                val displayAmount = kotlin.math.abs(expense.amount)
+                val prefix = if (isCredit) "+" else ""
+                
                 Text(
-                    text = formatCurrency(expense.amount),
+                    text = prefix + formatCurrency(displayAmount),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green for credits
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

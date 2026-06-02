@@ -106,9 +106,10 @@ interface SalaryRecordDao {
     fun getAllRecords(): Flow<List<SalaryRecord>>
 
     /** Sum of all expenses since [startTimestamp] — used to compute balance
-     *  Only includes expenses from projects where includeInSalary = true */
+     *  Only includes expenses from projects where includeInSalary = true
+     *  Only sums positive amounts (debits/expenses), excludes negative amounts (credits) */
     @Query("""
-        SELECT COALESCE(SUM(e.amount), 0.0)
+        SELECT COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0)
         FROM expenses e
         JOIN categories c ON e.categoryId = c.id
         JOIN projects p ON c.projectId = p.id
@@ -117,15 +118,17 @@ interface SalaryRecordDao {
     fun getTotalSpentSince(startTimestamp: Long): Flow<Double>
 
     /** Sum of expenses per category since a timestamp — for category breakdown
-     *  Only includes expenses from projects where includeInSalary = true */
+     *  Only includes expenses from projects where includeInSalary = true
+     *  Only sums positive amounts (debits/expenses), excludes negative amounts (credits) */
     @Query("""
         SELECT c.name as categoryName, c.emoji as categoryEmoji,
-               COALESCE(SUM(e.amount), 0.0) as total
+               COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) as total
         FROM expenses e
         JOIN categories c ON e.categoryId = c.id
         JOIN projects p ON c.projectId = p.id
         WHERE e.date >= :startTimestamp AND p.includeInSalary = 1
         GROUP BY e.categoryId
+        HAVING total > 0
         ORDER BY total DESC
         LIMIT 6
     """)

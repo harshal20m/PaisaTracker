@@ -52,6 +52,7 @@ import com.example.paisatracker.ui.common.ToastType
 import com.example.paisatracker.R
 import com.example.paisatracker.data.Asset
 import com.example.paisatracker.data.Expense
+import com.example.paisatracker.data.RecentExpense
 import com.example.paisatracker.ui.common.ZoomableImageDialog
 import com.example.paisatracker.util.formatCurrency
 import java.text.SimpleDateFormat
@@ -70,6 +71,19 @@ fun ExpenseDetailScreen(
 
     val expense by viewModel.getExpenseById(expenseId).collectAsState(initial = null)
     val assets  by viewModel.getAssetsForExpense(expenseId).collectAsState(initial = emptyList())
+    
+    // Fetch related expenses based on current expense
+    val relatedExpenses by remember(expense) {
+        if (expense != null) {
+            viewModel.getRelatedExpenses(
+                expenseId = expense!!.id,
+                description = expense!!.description,
+                amount = kotlin.math.abs(expense!!.amount)
+            )
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        }
+    }.collectAsState(initial = emptyList())
 
 
     // ── Edit state ────────────────────────────────────────────────────────────
@@ -124,10 +138,12 @@ fun ExpenseDetailScreen(
         ) {
             expense?.let { data ->
                 ExpenseDetailContent(
-                    expense       = data,
-                    assets        = assets,
-                    onAddAsset    = { pickImageLauncher.launch("image/*") },
-                    onDeleteAsset = { asset -> viewModel.deleteAsset(asset) }
+                    expense          = data,
+                    assets           = assets,
+                    relatedExpenses  = relatedExpenses,
+                    onAddAsset       = { pickImageLauncher.launch("image/*") },
+                    onDeleteAsset    = { asset -> viewModel.deleteAsset(asset) },
+                    onRelatedExpenseClick = { relatedId -> navController.navigate("expense_details/$relatedId") }
                 )
             } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Loading expense…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
@@ -312,8 +328,10 @@ private fun String.toIconKey(): String? = when (this) {
 private fun ExpenseDetailContent(
     expense: Expense,
     assets: List<Asset>,
+    relatedExpenses: List<RecentExpense>,
     onAddAsset: () -> Unit,
-    onDeleteAsset: (Asset) -> Unit
+    onDeleteAsset: (Asset) -> Unit,
+    onRelatedExpenseClick: (Long) -> Unit
 ) {
     var zoomImagePath by remember { mutableStateOf<String?>(null) }
     var assetToDelete by remember { mutableStateOf<Asset?>(null) }
@@ -327,10 +345,14 @@ private fun ExpenseDetailContent(
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Amount card
-        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(6.dp)) {
+        val isCredit = expense.amount < 0
+        val displayAmount = kotlin.math.abs(expense.amount)
+        val prefix = if (isCredit) "+" else ""
+        
+        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = if (isCredit) androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer), shape = RoundedCornerShape(24.dp), elevation = CardDefaults.cardElevation(6.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Amount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
-                Text(formatCurrency(expense.amount), style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text(if (isCredit) "Credit" else "Amount", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                Text(prefix + formatCurrency(displayAmount), style = MaterialTheme.typography.headlineLarge, color = if (isCredit) androidx.compose.ui.graphics.Color(0xFF4CAF50) else MaterialTheme.colorScheme.onPrimaryContainer)
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) {
                     Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.DateRange, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -360,8 +382,6 @@ private fun ExpenseDetailContent(
             }
         }
 
-
-
         // Assets
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(0.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -383,6 +403,73 @@ private fun ExpenseDetailContent(
                 }
             }
         }
+        
+        // Related Expenses (Collapsible Grid)
+        if (relatedExpenses.isNotEmpty()) {
+            var isExpanded by remember { mutableStateOf(false) }
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded }
+                    ) {
+                        Column {
+                            Text(
+                                "Similar Transactions (${relatedExpenses.size})",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                "Based on merchant or amount",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    AnimatedVisibility(
+                        visible = isExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            relatedExpenses.chunked(2).forEach { row ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    row.forEach { related ->
+                                        RelatedExpenseGridCard(
+                                            expense = related,
+                                            onClick = { onRelatedExpenseClick(related.id) },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    if (row.size == 1) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         Spacer(Modifier.height(110.dp))
     }
 
@@ -408,6 +495,79 @@ private fun ExpenseDetailContent(
 // ── UPI Transaction card (collapsible) ───────────────────────────────────────
 
 
+
+@Composable
+private fun RelatedExpenseGridCard(
+    expense: RecentExpense,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isCredit = expense.amount < 0
+    val displayAmount = kotlin.math.abs(expense.amount)
+    val prefix = if (isCredit) "+" else ""
+    
+    Card(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Category emoji at top
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = expense.categoryEmoji,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontSize = 24.sp
+                    )
+                }
+            }
+            
+            // Description and date in middle
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = expense.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(expense.date)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Amount at bottom
+            Text(
+                text = prefix + formatCurrency(displayAmount),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (isCredit) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
 
 @Composable private fun UpiRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {

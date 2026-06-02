@@ -45,10 +45,10 @@ interface CategoryDao {
     suspend fun getCategoryByName(name: String, projectId: Long): Category?
 
     @Query("""
-    SELECT 
-        c.*, 
-        COALESCE(SUM(e.amount), 0.0) AS totalAmount, 
-        COUNT(e.id) AS expenseCount,
+    SELECT
+        c.*,
+        COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) AS totalAmount,
+        COUNT(CASE WHEN e.amount > 0 THEN e.id END) AS expenseCount,
         MAX(e.date) AS latestExpenseTime
     FROM categories c
     LEFT JOIN expenses e ON c.id = e.categoryId
