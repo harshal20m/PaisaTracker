@@ -154,6 +154,7 @@ fun SmsHistoryScanScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DateRangeSelectionContent(
     selectedDateRange: ScanDateRange,
@@ -166,6 +167,10 @@ private fun DateRangeSelectionContent(
     onCustomEndDateSelected: (LocalDate) -> Unit,
     onStartScan: () -> Unit
 ) {
+    // Date picker states
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -231,7 +236,7 @@ private fun DateRangeSelectionContent(
                         // Start Date
                         OutlinedCard(
                             modifier = Modifier.weight(1f),
-                            onClick = { /* TODO: Show date picker */ }
+                            onClick = { showStartDatePicker = true }
                         ) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
@@ -253,7 +258,7 @@ private fun DateRangeSelectionContent(
                         // End Date
                         OutlinedCard(
                             modifier = Modifier.weight(1f),
-                            onClick = { /* TODO: Show date picker */ }
+                            onClick = { showEndDatePicker = true }
                         ) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
@@ -353,6 +358,69 @@ private fun DateRangeSelectionContent(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+    
+    // Date Picker Dialogs
+    if (showStartDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = customStartDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showStartDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+                            onCustomStartDateSelected(selectedDate)
+                        }
+                        showStartDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+    
+    if (showEndDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = customEndDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+                            onCustomEndDateSelected(selectedDate)
+                        }
+                        showEndDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

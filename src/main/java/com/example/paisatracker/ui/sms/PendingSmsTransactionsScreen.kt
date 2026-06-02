@@ -43,6 +43,10 @@ private val cardAccents = listOf(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
+enum class TransactionFilter {
+    ALL, DEBIT, CREDIT
+}
+
 @Composable
 fun PendingSmsTransactionsScreen(
     navController: NavHostController,
@@ -60,6 +64,22 @@ fun PendingSmsTransactionsScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedTransactionIds by remember { mutableStateOf(setOf<Long>()) }
     var showBulkConfirmSheet by remember { mutableStateOf(false) }
+    
+    // Filter state
+    var selectedFilter by remember { mutableStateOf(TransactionFilter.ALL) }
+    
+    // Filter transactions based on selected filter
+    val filteredTransactions = remember(pendingTransactions, selectedFilter) {
+        when (selectedFilter) {
+            TransactionFilter.ALL -> pendingTransactions
+            TransactionFilter.DEBIT -> pendingTransactions.filter {
+                it.status == com.example.paisatracker.data.SmsTransactionStatus.PENDING
+            }
+            TransactionFilter.CREDIT -> pendingTransactions.filter {
+                it.status == com.example.paisatracker.data.SmsTransactionStatus.CREDIT_PENDING
+            }
+        }
+    }
     
     val snackbarHostState     = remember { SnackbarHostState() }
 
@@ -115,15 +135,66 @@ fun PendingSmsTransactionsScreen(
                     }
                 }
             )
+            
+            // Filter chips
+            if (!isSelectionMode && pendingTransactions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedFilter == TransactionFilter.ALL,
+                        onClick = { selectedFilter = TransactionFilter.ALL },
+                        label = { Text("All (${pendingTransactions.size})") },
+                        leadingIcon = if (selectedFilter == TransactionFilter.ALL) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null
+                    )
+                    FilterChip(
+                        selected = selectedFilter == TransactionFilter.DEBIT,
+                        onClick = { selectedFilter = TransactionFilter.DEBIT },
+                        label = {
+                            Text("Debits (${pendingTransactions.count {
+                                it.status == com.example.paisatracker.data.SmsTransactionStatus.PENDING
+                            }})")
+                        },
+                        leadingIcon = if (selectedFilter == TransactionFilter.DEBIT) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    )
+                    FilterChip(
+                        selected = selectedFilter == TransactionFilter.CREDIT,
+                        onClick = { selectedFilter = TransactionFilter.CREDIT },
+                        label = {
+                            Text("Credits (${pendingTransactions.count {
+                                it.status == com.example.paisatracker.data.SmsTransactionStatus.CREDIT_PENDING
+                            }})")
+                        },
+                        leadingIcon = if (selectedFilter == TransactionFilter.CREDIT) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        } else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                            selectedLabelColor = Color(0xFF1B5E20)
+                        )
+                    )
+                }
+            }
 
             when {
                 isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
-                pendingTransactions.isEmpty() -> EmptyState(
+                filteredTransactions.isEmpty() -> EmptyState(
                     icon        = Icons.Default.CheckCircle,
-                    title       = "All Caught Up!",
-                    description = "No pending SMS transactions to review",
+                    title       = if (pendingTransactions.isEmpty()) "All Caught Up!" else "No ${selectedFilter.name.lowercase()} transactions",
+                    description = if (pendingTransactions.isEmpty()) "No pending SMS transactions to review" else "Try selecting a different filter",
                     modifier    = Modifier.fillMaxSize()
                 )
                 else -> LazyColumn(
@@ -131,10 +202,10 @@ fun PendingSmsTransactionsScreen(
                     contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(pendingTransactions, key = { it.id }) { txn ->
+                    items(filteredTransactions, key = { it.id }) { txn ->
                         PendingTransactionCard(
                             transaction  = txn,
-                            accentColors = cardAccents[pendingTransactions.indexOf(txn) % cardAccents.size],
+                            accentColors = cardAccents[filteredTransactions.indexOf(txn) % cardAccents.size],
                             isSelectionMode = isSelectionMode,
                             isSelected = selectedTransactionIds.contains(txn.id),
                             onSelectionToggle = {
@@ -492,16 +563,25 @@ fun PendingTransactionCard(
                     }
                 }
 
-                // Amount pill
+                // Amount pill - dynamically show DEBIT or CREDIT based on transaction type
+                val isCredit = transaction.transactionType?.contains("CREDIT", ignoreCase = true) == true ||
+                               transaction.transactionType?.contains("INCOME", ignoreCase = true) == true
+                
                 Column(
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                        .background(
+                            if (isCredit) {
+                                Color(0xFF4CAF50).copy(alpha = 0.15f) // Light green background
+                            } else {
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            }
+                        )
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalAlignment = Alignment.End
                 ) {
                     Text(
-                        text          = "DEBIT",
+                        text          = if (isCredit) "CREDIT" else "DEBIT",
                         fontSize      = 9.sp,
                         fontWeight    = FontWeight.SemiBold,
                         letterSpacing = 1.sp,
@@ -511,7 +591,11 @@ fun PendingTransactionCard(
                         text       = "₹${String.format("%.2f", transaction.amount ?: 0.0)}",
                         fontSize   = 17.sp,
                         fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.error
+                        color      = if (isCredit) {
+                            Color(0xFF4CAF50) // Green color for credit
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        }
                     )
                 }
             }

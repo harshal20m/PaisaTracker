@@ -71,7 +71,7 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
 
     // ── SMS Transactions ──────────────────────────────────────────────────────
     val smsViewModel = remember {
-        SmsTransactionViewModel(application)
+        SmsTransactionViewModel(application, viewModel)
     }
     
     // ── SMS History Scan ──────────────────────────────────────────────────────

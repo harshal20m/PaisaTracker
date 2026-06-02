@@ -28,6 +28,19 @@ class SmsHistoryScanViewModel(application: Application) : AndroidViewModel(appli
     
     private val database = PaisaTrackerDatabase.getDatabase(application)
     private val smsPreferences = SmsPreferences(application)
+    private val repository = com.example.paisatracker.data.PaisaTrackerRepository(
+        projectDao = database.projectDao(),
+        categoryDao = database.categoryDao(),
+        expenseDao = database.expenseDao(),
+        assetDao = database.assetDao(),
+        backupDao = database.backupDao(),
+        budgetDao = database.budgetDao(),
+        flapDao = database.flapDao(),
+        salaryRecordDao = database.salaryRecordDao(),
+        actionHistoryDao = database.actionHistoryDao(),
+        bankAccountDao = database.bankAccountDao(),
+        bankNotificationDao = database.bankNotificationDao()
+    )
     
     // Initialize scanner
     private val smsTransactionProcessor = SmsTransactionProcessor(
@@ -40,7 +53,8 @@ class SmsHistoryScanViewModel(application: Application) : AndroidViewModel(appli
         merchantRuleRepository = com.example.paisatracker.data.MerchantRuleRepository(
             database.merchantRuleDao(),
             application
-        )
+        ),
+        repository = repository
     )
     
     private val smsHistoryScanner = SmsHistoryScanner(

@@ -5,13 +5,14 @@ import androidx.room.PrimaryKey
 
 /**
  * Represents a bank account or payment source for tracking expenses.
- * 
+ *
  * Features:
  * - Multiple account support (Bank accounts, Credit cards, Cash, Digital wallets)
  * - Balance tracking with initial balance
  * - Account type categorization
  * - Color coding for visual distinction
  * - Active/Inactive status
+ * - SMS transaction matching via last 4 digits
  */
 @Entity(tableName = "bank_accounts")
 data class BankAccount(
@@ -26,6 +27,9 @@ data class BankAccount(
     
     /** Optional bank name (e.g., "HDFC Bank", "State Bank of India") */
     val bankName: String? = null,
+    
+    /** Last 4 digits of account number for SMS matching (optional) */
+    val accountNumberLast4: String? = null,
     
     /** Initial balance when account was added */
     val initialBalance: Double = 0.0,

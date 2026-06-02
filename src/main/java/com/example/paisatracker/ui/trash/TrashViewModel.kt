@@ -23,6 +23,19 @@ class TrashViewModel(application: Application) : AndroidViewModel(application) {
         database.merchantRuleDao(),
         application.applicationContext
     )
+    private val repository = com.example.paisatracker.data.PaisaTrackerRepository(
+        projectDao = database.projectDao(),
+        categoryDao = database.categoryDao(),
+        expenseDao = database.expenseDao(),
+        assetDao = database.assetDao(),
+        backupDao = database.backupDao(),
+        budgetDao = database.budgetDao(),
+        flapDao = database.flapDao(),
+        salaryRecordDao = database.salaryRecordDao(),
+        actionHistoryDao = database.actionHistoryDao(),
+        bankAccountDao = database.bankAccountDao(),
+        bankNotificationDao = database.bankNotificationDao()
+    )
     
     private val smsTransactionProcessor = SmsTransactionProcessor(
         context = application,
@@ -31,7 +44,8 @@ class TrashViewModel(application: Application) : AndroidViewModel(application) {
         bankNotificationRepository = bankNotificationRepository,
         unrecognizedSmsRepository = com.example.paisatracker.data.UnrecognizedSmsRepository(database.unrecognizedSmsDao()),
         smsPreferences = smsPreferences,
-        merchantRuleRepository = merchantRuleRepository
+        merchantRuleRepository = merchantRuleRepository,
+        repository = repository
     )
 
     // Trashed transactions

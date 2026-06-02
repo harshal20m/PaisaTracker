@@ -27,7 +27,10 @@ data class RuleDetectionResult(
     val ruleMatched: Boolean = false
 )
 
-class SmsTransactionViewModel(application: Application) : AndroidViewModel(application) {
+class SmsTransactionViewModel(
+    application: Application,
+    private val globalViewModel: com.example.paisatracker.PaisaTrackerViewModel
+) : AndroidViewModel(application) {
     private val database = PaisaTrackerDatabase.getDatabase(application)
     private val bankNotificationRepository = BankNotificationRepository(database.bankNotificationDao())
     private val categoryDao: CategoryDao = database.categoryDao()
@@ -37,6 +40,19 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
         database.merchantRuleDao(),
         application.applicationContext
     )
+    private val repository = com.example.paisatracker.data.PaisaTrackerRepository(
+        projectDao = database.projectDao(),
+        categoryDao = database.categoryDao(),
+        expenseDao = database.expenseDao(),
+        assetDao = database.assetDao(),
+        backupDao = database.backupDao(),
+        budgetDao = database.budgetDao(),
+        flapDao = database.flapDao(),
+        salaryRecordDao = database.salaryRecordDao(),
+        actionHistoryDao = database.actionHistoryDao(),
+        bankAccountDao = database.bankAccountDao(),
+        bankNotificationDao = database.bankNotificationDao()
+    )
     
     private val smsTransactionProcessor = SmsTransactionProcessor(
         context = application,
@@ -45,7 +61,8 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
         bankNotificationRepository = bankNotificationRepository,
         unrecognizedSmsRepository = com.example.paisatracker.data.UnrecognizedSmsRepository(database.unrecognizedSmsDao()),
         smsPreferences = smsPreferences,
-        merchantRuleRepository = merchantRuleRepository
+        merchantRuleRepository = merchantRuleRepository,
+        repository = repository
     )
 
     // Pending transactions
@@ -107,12 +124,12 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
                     projectId = projectId
                 )
                 if (result.success) {
-                    _successMessage.value = "Transaction confirmed successfully"
+                    globalViewModel.showToast("Transaction confirmed successfully", com.example.paisatracker.ui.common.ToastType.SUCCESS)
                 } else {
-                    _errorMessage.value = result.reason ?: "Failed to confirm transaction"
+                    globalViewModel.showToast(result.reason ?: "Failed to confirm transaction", com.example.paisatracker.ui.common.ToastType.ERROR)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error confirming transaction: ${e.message}"
+                globalViewModel.showToast("Error confirming transaction: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             } finally {
                 _isLoading.value = false
             }
@@ -130,12 +147,12 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
                 val result = smsTransactionProcessor.rejectPendingTransaction(notificationId)
                 if (result.success) {
                     val retentionDays = smsPreferences.getTrashRetentionDays()
-                    _successMessage.value = "Transaction moved to trash (auto-deletes in $retentionDays days)"
+                    globalViewModel.showToast("Transaction moved to trash (auto-deletes in $retentionDays days)", com.example.paisatracker.ui.common.ToastType.INFO)
                 } else {
-                    _errorMessage.value = result.reason ?: "Failed to reject transaction"
+                    globalViewModel.showToast(result.reason ?: "Failed to reject transaction", com.example.paisatracker.ui.common.ToastType.ERROR)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error rejecting transaction: ${e.message}"
+                globalViewModel.showToast("Error rejecting transaction: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             } finally {
                 _isLoading.value = false
             }
@@ -152,12 +169,12 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
             try {
                 val result = smsTransactionProcessor.restoreTransaction(notificationId)
                 if (result.success) {
-                    _successMessage.value = "Transaction restored to pending"
+                    globalViewModel.showToast("Transaction restored to pending", com.example.paisatracker.ui.common.ToastType.SUCCESS)
                 } else {
-                    _errorMessage.value = result.reason ?: "Failed to restore transaction"
+                    globalViewModel.showToast(result.reason ?: "Failed to restore transaction", com.example.paisatracker.ui.common.ToastType.ERROR)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error restoring transaction: ${e.message}"
+                globalViewModel.showToast("Error restoring transaction: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             } finally {
                 _isLoading.value = false
             }
@@ -188,9 +205,9 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
             _isLoading.value = true
             try {
                 bankNotificationRepository.deleteAllNotifications()
-                _successMessage.value = "Scan history cleared successfully"
+                globalViewModel.showToast("Scan history cleared successfully", com.example.paisatracker.ui.common.ToastType.SUCCESS)
             } catch (e: Exception) {
-                _errorMessage.value = "Error clearing scan history: ${e.message}"
+                globalViewModel.showToast("Error clearing scan history: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             } finally {
                 _isLoading.value = false
             }
@@ -226,12 +243,12 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
                 }
                 
                 if (failCount == 0) {
-                    _successMessage.value = "Successfully confirmed $successCount transaction${if (successCount != 1) "s" else ""}"
+                    globalViewModel.showToast("Successfully confirmed $successCount transaction${if (successCount != 1) "s" else ""}", com.example.paisatracker.ui.common.ToastType.SUCCESS)
                 } else {
-                    _successMessage.value = "Confirmed $successCount, failed $failCount transaction${if (failCount != 1) "s" else ""}"
+                    globalViewModel.showToast("Confirmed $successCount, failed $failCount transaction${if (failCount != 1) "s" else ""}", com.example.paisatracker.ui.common.ToastType.WARNING)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error in bulk confirmation: ${e.message}"
+                globalViewModel.showToast("Error in bulk confirmation: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             } finally {
                 _isLoading.value = false
             }
@@ -269,7 +286,7 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
             
             if (!useMerchantRules) {
                 Log.d(TAG, "Merchant rules disabled, returning no match")
-                _errorMessage.value = "Merchant rules are disabled. Enable them in SMS settings."
+                globalViewModel.showToast("Merchant rules are disabled. Enable them in SMS settings.", com.example.paisatracker.ui.common.ToastType.INFO)
                 return RuleDetectionResult(ruleMatched = false)
             }
 
@@ -288,7 +305,7 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
                 val project = matchingRule.projectId?.let { projectDao.getProjectByIdSync(it) }
                 Log.d(TAG, "  Project found: ${project?.name ?: "NULL"}")
                 
-                _successMessage.value = "Detected: ${category?.name ?: "Unknown"}"
+                globalViewModel.showToast("Detected: ${category?.name ?: "Unknown"}", com.example.paisatracker.ui.common.ToastType.SUCCESS)
                 
                 return RuleDetectionResult(
                     category = category,
@@ -298,11 +315,11 @@ class SmsTransactionViewModel(application: Application) : AndroidViewModel(appli
             }
 
             Log.d(TAG, "✗ No matching rule found for merchant: $merchant")
-            _errorMessage.value = "No rule found for '$merchant'. Create a rule in Merchant Rules."
+            globalViewModel.showToast("No rule found for '$merchant'. Create a rule in Merchant Rules.", com.example.paisatracker.ui.common.ToastType.INFO)
             return RuleDetectionResult(ruleMatched = false)
         } catch (e: Exception) {
             Log.e(TAG, "Error detecting category: ${e.message}", e)
-            _errorMessage.value = "Error detecting category: ${e.message}"
+            globalViewModel.showToast("Error detecting category: ${e.message}", com.example.paisatracker.ui.common.ToastType.ERROR)
             return RuleDetectionResult(ruleMatched = false)
         }
     }

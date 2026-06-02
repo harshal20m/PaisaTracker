@@ -74,6 +74,19 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             context
         )
         val smsPreferences = SmsPreferences(context)
+        val repository = com.example.paisatracker.data.PaisaTrackerRepository(
+            projectDao = database.projectDao(),
+            categoryDao = database.categoryDao(),
+            expenseDao = database.expenseDao(),
+            assetDao = database.assetDao(),
+            backupDao = database.backupDao(),
+            budgetDao = database.budgetDao(),
+            flapDao = database.flapDao(),
+            salaryRecordDao = database.salaryRecordDao(),
+            actionHistoryDao = database.actionHistoryDao(),
+            bankAccountDao = database.bankAccountDao(),
+            bankNotificationDao = database.bankNotificationDao()
+        )
         
         val processor = SmsTransactionProcessor(
             context = context,
@@ -82,7 +95,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             bankNotificationRepository = bankNotificationRepo,
             unrecognizedSmsRepository = unrecognizedSmsRepo,
             smsPreferences = smsPreferences,
-            merchantRuleRepository = merchantRuleRepo
+            merchantRuleRepository = merchantRuleRepo,
+            repository = repository
         )
 
         // Process each unique SMS

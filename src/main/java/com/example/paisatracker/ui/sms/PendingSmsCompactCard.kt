@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,17 +221,21 @@ private fun CompactTransactionRow(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                // Detect if credit or debit
+                val isCredit = transaction.transactionType?.contains("CREDIT", ignoreCase = true) == true ||
+                               transaction.transactionType?.contains("INCOME", ignoreCase = true) == true
+                
                 // Amount chip
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.errorContainer
+                    color = if (isCredit) Color(0xFF4CAF50).copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer
                 ) {
                     Text(
                         text       = "₹${String.format("%.2f", transaction.amount ?: 0.0)}",
                         modifier   = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                         fontSize   = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.error
+                        color      = if (isCredit) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
                     )
                 }
                 transaction.bankName?.let {

@@ -155,8 +155,12 @@ fun AppNavigation(
             )
         }
         composable("pending_sms") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application, viewModel)
             PendingSmsTransactionsScreen(
-                navController = navController
+                navController = navController,
+                viewModel = smsViewModel
             )
         }
         composable("sms_trash") {
@@ -169,14 +173,18 @@ fun AppNavigation(
             )
         }
         composable("sms_settings") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application, viewModel)
             SmsSettingsScreen(
-                navController = navController
+                navController = navController,
+                viewModel = smsViewModel
             )
         }
         composable("auto_create_config") {
             val context = LocalContext.current
             val application = context.applicationContext as PaisaTrackerApplication
-            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application)
+            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application, viewModel)
             AutoCreateConfigScreen(
                 navController = navController,
                 smsViewModel = smsViewModel
@@ -192,8 +200,12 @@ fun AppNavigation(
             )
         }
         composable("sms_history_scan") {
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val smsHistoryScanViewModel = com.example.paisatracker.ui.sms.SmsHistoryScanViewModel(application)
             SmsHistoryScanScreen(
-                navController = navController
+                navController = navController,
+                viewModel = smsHistoryScanViewModel
             )
         }
     }

@@ -37,14 +37,17 @@ interface BankNotificationDao {
     @Query("SELECT * FROM bank_notifications WHERE processed = 0 ORDER BY posted_at DESC")
     suspend fun getUnprocessed(): List<BankNotificationEntity>
 
-    @Query("SELECT * FROM bank_notifications WHERE status = 'PENDING' ORDER BY posted_at DESC")
+    @Query("SELECT * FROM bank_notifications WHERE status IN ('PENDING', 'CREDIT_PENDING') ORDER BY posted_at DESC")
     fun getPendingTransactions(): Flow<List<BankNotificationEntity>>
 
-    @Query("SELECT * FROM bank_notifications WHERE status = 'PENDING' ORDER BY posted_at DESC")
+    @Query("SELECT * FROM bank_notifications WHERE status IN ('PENDING', 'CREDIT_PENDING') ORDER BY posted_at DESC")
     suspend fun getPendingTransactionsList(): List<BankNotificationEntity>
 
-    @Query("SELECT COUNT(*) FROM bank_notifications WHERE status = 'PENDING'")
+    @Query("SELECT COUNT(*) FROM bank_notifications WHERE status IN ('PENDING', 'CREDIT_PENDING')")
     fun getPendingCount(): Flow<Int>
+    
+    @Query("SELECT * FROM bank_notifications WHERE status = 'CREDIT_PENDING' ORDER BY posted_at DESC")
+    fun getCreditPendingTransactions(): Flow<List<BankNotificationEntity>>
 
     @Query("SELECT * FROM bank_notifications ORDER BY posted_at DESC")
     fun getAllNotifications(): Flow<List<BankNotificationEntity>>

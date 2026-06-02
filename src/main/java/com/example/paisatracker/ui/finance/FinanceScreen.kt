@@ -304,6 +304,7 @@ private fun AccountsTab(
                     name = name,
                     accountType = type,
                     bankName = bankName,
+                    accountNumberLast4 = null,
                     initialBalance = balance,
                     emoji = emoji,
                     colorHex = color,

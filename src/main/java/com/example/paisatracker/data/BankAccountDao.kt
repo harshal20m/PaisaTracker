@@ -24,6 +24,10 @@ interface BankAccountDao {
     @Query("SELECT * FROM bank_accounts ORDER BY createdAt DESC")
     fun getAllAccounts(): Flow<List<BankAccount>>
     
+    /** Get all bank accounts (one-time fetch) */
+    @Query("SELECT * FROM bank_accounts ORDER BY createdAt DESC")
+    suspend fun getAllAccountsList(): List<BankAccount>
+    
     /** Get only active accounts */
     @Query("SELECT * FROM bank_accounts WHERE isActive = 1 ORDER BY createdAt DESC")
     fun getActiveAccounts(): Flow<List<BankAccount>>
@@ -56,6 +60,10 @@ interface BankAccountDao {
         ORDER BY name ASC
     """)
     fun searchAccounts(query: String): Flow<List<BankAccount>>
+    
+    /** Find bank account by last 4 digits of account number */
+    @Query("SELECT * FROM bank_accounts WHERE accountNumberLast4 = :last4 AND isActive = 1 LIMIT 1")
+    suspend fun findByAccountLast4(last4: String): BankAccount?
     
     // ── Update ────────────────────────────────────────────────────────────────
     

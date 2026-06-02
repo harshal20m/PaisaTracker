@@ -38,8 +38,11 @@ data class TourPage(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AppTourSheet(
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onBankAccountAdded: (String, String, String, String, Double) -> Unit = { _, _, _, _, _ -> }
 ) {
+    var showBankAccountSetup by remember { mutableStateOf(false) }
+    
     val pages = listOf(
         TourPage(
             "🚀",
@@ -186,7 +189,8 @@ fun AppTourSheet(
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
                             }
                         } else {
-                            onComplete()
+                            // Show bank account setup before completing
+                            showBankAccountSetup = true
                         }
                     },
                     modifier = Modifier.weight(2f),
@@ -199,6 +203,27 @@ fun AppTourSheet(
                     )
                 }
             }
+        }
+    }
+    
+    // Bank Account Setup Sheet
+    if (showBankAccountSetup) {
+        ModalBottomSheet(
+            onDismissRequest = { },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            BankAccountSetupSheet(
+                onSkip = {
+                    showBankAccountSetup = false
+                    onComplete()
+                },
+                onAccountAdded = { name, bankName, last4, type, balance ->
+                    onBankAccountAdded(name, bankName, last4, type, balance)
+                    showBankAccountSetup = false
+                    onComplete()
+                }
+            )
         }
     }
 }

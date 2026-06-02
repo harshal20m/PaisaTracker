@@ -1012,11 +1012,20 @@ private fun TransactionItem(
                 }
             }
 
+            // Show credits in green with + prefix, debits in red
+            val isCredit = expense.amount < 0
+            val displayAmount = kotlin.math.abs(expense.amount)
+            val prefix = if (isCredit) "+" else ""
+            
             Text(
-                text = formatCurrency(expense.amount),
+                text = "$prefix${formatCurrency(displayAmount)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
+                color = if (isCredit) {
+                    Color(0xFF4CAF50)  // Green for credits
+                } else {
+                    MaterialTheme.colorScheme.error  // Red for debits
+                }
             )
         }
     }

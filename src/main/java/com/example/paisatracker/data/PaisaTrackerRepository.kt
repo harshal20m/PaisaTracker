@@ -21,6 +21,9 @@ class PaisaTrackerRepository(
     fun getAllBankAccounts(): Flow<List<BankAccount>> =
         bankAccountDao.getAllAccounts()
     
+    suspend fun getAllBankAccountsList(): List<BankAccount> =
+        bankAccountDao.getAllAccountsList()
+    
     fun getActiveBankAccounts(): Flow<List<BankAccount>> =
         bankAccountDao.getActiveAccounts()
     
@@ -44,6 +47,9 @@ class PaisaTrackerRepository(
     
     fun getAccountBalances(): Flow<List<AccountBalance>> =
         bankAccountDao.getAccountBalances()
+    
+    suspend fun findBankAccountByLast4(last4: String): BankAccount? =
+        bankAccountDao.findByAccountLast4(last4)
     
     suspend fun insertBankAccount(account: BankAccount): Long =
         bankAccountDao.insert(account)

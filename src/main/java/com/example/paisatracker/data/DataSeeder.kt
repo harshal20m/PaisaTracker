@@ -10,6 +10,7 @@ class DataSeeder(private val repository: PaisaTrackerRepository) {
         private const val PREFS_NAME = "app_prefs"
         private const val KEY_DATA_SEEDED = "data_seeded"
         private const val KEY_USER_CHOICE = "user_choice"
+        private const val KEY_TOUR_SHOWN = "tour_shown"
 
         @Volatile
         private var INSTANCE: DataSeeder? = null
@@ -23,7 +24,15 @@ class DataSeeder(private val repository: PaisaTrackerRepository) {
 
     fun shouldShowFirstTimeSetup(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return !prefs.getBoolean(KEY_DATA_SEEDED, false)
+        // Show tour if it hasn't been shown yet
+        return !prefs.getBoolean(KEY_TOUR_SHOWN, false)
+    }
+    
+    fun markTourAsShown(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit {
+            putBoolean(KEY_TOUR_SHOWN, true)
+        }
     }
 
     suspend fun seedInitialDataIfUserAccepts(context: Context, shouldSeed: Boolean) {

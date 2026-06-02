@@ -23,7 +23,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         UnrecognizedSmsEntity::class,
         MerchantRuleEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,7 +53,7 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                     PaisaTrackerDatabase::class.java,
                     "paisa_tracker_database_v2"  // New database name for fresh start
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .fallbackToDestructiveMigration()  // Allow destructive migration for fresh start
                     .build()
                 INSTANCE = instance
@@ -73,6 +73,18 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                 // Add transaction_type column to bank_notifications table
                 database.execSQL(
                     "ALTER TABLE bank_notifications ADD COLUMN transaction_type TEXT"
+                )
+            }
+        }
+        
+        /**
+         * Migration from version 2 to 3: Add accountNumberLast4 field to bank_accounts
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Add accountNumberLast4 column to bank_accounts table
+                database.execSQL(
+                    "ALTER TABLE bank_accounts ADD COLUMN accountNumberLast4 TEXT"
                 )
             }
         }

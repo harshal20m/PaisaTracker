@@ -125,6 +125,33 @@ class MainActivity : FragmentActivity() {
                         onComplete = {
                             showAppTour = false
                             showFirstTimeSetup = true
+                            // Mark tour as shown so it doesn't appear again
+                            dataSeeder.markTourAsShown(this@MainActivity)
+                        },
+                        onBankAccountAdded = { name, bankName, last4, type, balance ->
+                            // Create bank account during tour
+                            lifecycleScope.launch {
+                                try {
+                                    val account = com.example.paisatracker.data.BankAccount(
+                                        name = name,
+                                        accountType = type,
+                                        bankName = bankName,
+                                        accountNumberLast4 = last4,
+                                        initialBalance = balance,
+                                        currentBalance = balance,
+                                        emoji = when(type) {
+                                            com.example.paisatracker.data.AccountType.CREDIT_CARD -> "💳"
+                                            else -> "🏦"
+                                        },
+                                        colorHex = "#2196F3",
+                                        isActive = true
+                                    )
+                                    (application as PaisaTrackerApplication).repository.insertBankAccount(account)
+                                    Log.d("MainActivity", "Bank account created during tour: $name")
+                                } catch (e: Exception) {
+                                    Log.e("MainActivity", "Failed to create bank account: ${e.message}", e)
+                                }
+                            }
                         }
                     )
                 }

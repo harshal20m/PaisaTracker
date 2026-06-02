@@ -2,6 +2,7 @@ package com.example.paisatracker.manager
 
 import android.content.Context
 import android.util.Log
+import com.example.paisatracker.data.BankAccount
 import com.example.paisatracker.data.BankNotificationEntity
 import com.example.paisatracker.data.BankNotificationRepository
 import com.example.paisatracker.data.Category
@@ -31,7 +32,8 @@ class SmsTransactionProcessor(
     private val bankNotificationRepository: BankNotificationRepository,
     private val unrecognizedSmsRepository: UnrecognizedSmsRepository,
     private val smsPreferences: SmsPreferences,
-    private val merchantRuleRepository: com.example.paisatracker.data.MerchantRuleRepository
+    private val merchantRuleRepository: com.example.paisatracker.data.MerchantRuleRepository,
+    private val repository: com.example.paisatracker.data.PaisaTrackerRepository
 ) {
     companion object {
         private const val TAG = "SmsTransactionProcessor"
@@ -143,9 +145,9 @@ class SmsTransactionProcessor(
                     }
                 }
                 TransactionType.INCOME, TransactionType.CREDIT -> {
-                    // Save credit transactions as pending for user review
+                    // Try to auto-process credit if bank account exists
                     Log.d(TAG, "Credit transaction detected: ${parsedTransaction.amount}")
-                    return savePendingCreditTransaction(parsedTransaction, sender, smsBody, timestamp)
+                    return processAutomaticCredit(parsedTransaction, sender, smsBody, timestamp)
                 }
                 else -> {
                     Log.d(TAG, "Unsupported transaction type: ${parsedTransaction.type}")
@@ -249,6 +251,64 @@ class SmsTransactionProcessor(
     }
 
     /**
+     * Automatically process credit transaction by updating bank account balance
+     */
+    private suspend fun processAutomaticCredit(
+        parsedTransaction: ParsedTransaction,
+        sender: String,
+        smsBody: String,
+        timestamp: Long
+    ): ProcessingResult {
+        return try {
+            val accountLast4 = parsedTransaction.accountLast4
+            
+            // Try to find matching bank account
+            val bankAccount = if (accountLast4 != null) {
+                repository.findBankAccountByLast4(accountLast4)
+            } else {
+                null
+            }
+            
+            if (bankAccount != null) {
+                // Update bank balance automatically
+                val newBalance = bankAccount.currentBalance + parsedTransaction.amount.toDouble()
+                repository.updateBankAccountBalance(bankAccount.id, newBalance)
+                
+                Log.d(TAG, "Auto-processed credit: ${parsedTransaction.amount} to account ${bankAccount.name}")
+                
+                // Save notification as auto-processed
+                val messageHash = generateMessageHash(sender, smsBody, timestamp)
+                val notification = BankNotificationEntity(
+                    packageName = "SMS",
+                    senderAlias = parsedTransaction.sender,
+                    messageBody = smsBody,
+                    messageHash = messageHash,
+                    postedAt = Instant.ofEpochMilli(timestamp)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime(),
+                    processed = true,
+                    status = SmsTransactionStatus.AUTO_CREATED,
+                    amount = parsedTransaction.amount.toDouble(),
+                    merchant = parsedTransaction.merchant ?: "Credit",
+                    bankName = parsedTransaction.bankName,
+                    accountLast4 = parsedTransaction.accountLast4,
+                    transactionType = parsedTransaction.type.name
+                )
+                
+                val notificationId = bankNotificationRepository.insert(notification)
+                return ProcessingResult(true, notificationId = notificationId)
+            } else {
+                // No matching account - save as pending
+                Log.d(TAG, "No matching bank account found for credit, saving as pending")
+                return savePendingCreditTransaction(parsedTransaction, sender, smsBody, timestamp)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing automatic credit: ${e.message}", e)
+            return ProcessingResult(false, reason = e.message)
+        }
+    }
+
+    /**
      * Creates an expense from a parsed transaction
      * Now supports merchant rules for automatic categorization
      */
@@ -291,17 +351,36 @@ class SmsTransactionProcessor(
                 getOrCreateCategory(parsedTransaction.merchant)
             }
             
-            // Create expense
+            // Try to find matching bank account for automatic debit
+            val accountLast4 = parsedTransaction.accountLast4
+            val bankAccount = if (accountLast4 != null) {
+                repository.findBankAccountByLast4(accountLast4)
+            } else {
+                null
+            }
+            
+            // Create expense with bank account link
             val expense = Expense(
                 amount = parsedTransaction.amount.toDouble(),
                 date = timestamp,
                 description = parsedTransaction.merchant ?: "SMS Transaction",
                 categoryId = category.id,
                 paymentMethod = parsedTransaction.bankName,
-                paymentIcon = "🏦"
+                paymentIcon = "🏦",
+                bankAccountId = bankAccount?.id
             )
 
             val expenseId = expenseDao.insert(expense)
+            
+            // Automatically deduct from bank account if found
+            if (bankAccount != null && expenseId != -1L) {
+                try {
+                    repository.decrementBankAccountBalance(bankAccount.id, parsedTransaction.amount.toDouble())
+                    Log.d(TAG, "Auto-debited ${parsedTransaction.amount} from account ${bankAccount.name}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to auto-debit from bank account: ${e.message}", e)
+                }
+            }
             
             if (expenseId != -1L) {
                 Log.d(TAG, "Created expense with ID: $expenseId")
@@ -444,21 +523,27 @@ class SmsTransactionProcessor(
             val notification = bankNotificationRepository.getById(notificationId)
                 ?: return ProcessingResult(false, reason = "Notification not found")
 
-            if (notification.status != SmsTransactionStatus.PENDING) {
+            // Allow both PENDING and CREDIT_PENDING transactions to be confirmed
+            if (notification.status != SmsTransactionStatus.PENDING &&
+                notification.status != SmsTransactionStatus.CREDIT_PENDING) {
                 return ProcessingResult(false, reason = "Transaction is not pending")
             }
+
+            val amount = notification.amount ?: 0.0
+            val isCredit = notification.status == SmsTransactionStatus.CREDIT_PENDING
 
             // Get or create category
             val category = if (categoryId != null) {
                 categoryDao.getCategoryByIdSync(categoryId)
                     ?: return ProcessingResult(false, reason = "Category not found")
             } else {
-                getOrCreateCategory(notification.merchant)
+                // Use default "Uncategorized" category instead of creating new ones
+                getOrCreateCategory(DEFAULT_CATEGORY_NAME)
             }
 
-            // Create expense
+            // Create expense - use negative amount for credits (income)
             val expense = Expense(
-                amount = notification.amount ?: 0.0,
+                amount = if (isCredit) -amount else amount,  // Negative for credits
                 date = notification.postedAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                 description = notification.merchant ?: "SMS Transaction",
                 categoryId = category.id,
@@ -469,6 +554,47 @@ class SmsTransactionProcessor(
             val expenseId = expenseDao.insert(expense)
 
             if (expenseId != -1L) {
+                // Update bank account balance if account is found
+                var bankAccount: BankAccount? = null
+                
+                // Try to find bank account by last4 digits first
+                notification.accountLast4?.let { last4 ->
+                    bankAccount = repository.findBankAccountByLast4(last4)
+                    if (bankAccount != null) {
+                        Log.d(TAG, "Found bank account by last4: ${bankAccount?.name}")
+                    } else {
+                        Log.d(TAG, "Bank account not found for last4: $last4")
+                    }
+                }
+                
+                // If not found by last4, try to find by bank name
+                if (bankAccount == null && notification.bankName != null) {
+                    val allAccounts = repository.getAllBankAccountsList()
+                    bankAccount = allAccounts.firstOrNull {
+                        it.bankName.equals(notification.bankName, ignoreCase = true)
+                    }
+                    if (bankAccount != null) {
+                        Log.d(TAG, "Found bank account by bank name: ${bankAccount?.name}")
+                    } else {
+                        Log.d(TAG, "Bank account not found for bank name: ${notification.bankName}")
+                    }
+                }
+                
+                // Update balance if bank account found
+                if (bankAccount != null) {
+                    if (isCredit) {
+                        // Credit: Add to bank account balance
+                        repository.incrementBankAccountBalance(bankAccount.id, amount)
+                        Log.d(TAG, "✅ Credited ₹$amount to bank account ${bankAccount.name} (New balance will be updated)")
+                    } else {
+                        // Debit: Subtract from bank account balance
+                        repository.decrementBankAccountBalance(bankAccount.id, amount)
+                        Log.d(TAG, "✅ Debited ₹$amount from bank account ${bankAccount.name} (New balance will be updated)")
+                    }
+                } else {
+                    Log.w(TAG, "⚠️ Could not find bank account to update balance. accountLast4=${notification.accountLast4}, bankName=${notification.bankName}")
+                }
+
                 // Update notification status
                 val updatedNotification = notification.copy(
                     status = SmsTransactionStatus.CONFIRMED,

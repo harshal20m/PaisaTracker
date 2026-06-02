@@ -289,17 +289,26 @@ private fun AnimatedTransactionCard(
                 )
             }
 
-            // Bottom: amount
+            // Bottom: amount - green for credits (negative), red for debits (positive)
+            val isCredit = expense.amount < 0
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.errorContainer
+                color = if (isCredit) {
+                    androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.15f)
+                } else {
+                    MaterialTheme.colorScheme.errorContainer
+                }
             ) {
                 Text(
-                    formatCurrency(expense.amount),
+                    formatCurrency(kotlin.math.abs(expense.amount)),
                     modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     style      = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color      = MaterialTheme.colorScheme.error
+                    color      = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
                 )
             }
         }
@@ -366,16 +375,26 @@ private fun RecentTransactionGridItem(
                 )
             }
 
+            // Amount - green for credits (negative), red for debits (positive)
+            val isCredit = expense.amount < 0
             Surface(
                 shape = RoundedCornerShape(5.dp),
-                color = MaterialTheme.colorScheme.errorContainer
+                color = if (isCredit) {
+                    androidx.compose.ui.graphics.Color(0xFF4CAF50).copy(alpha = 0.15f)
+                } else {
+                    MaterialTheme.colorScheme.errorContainer
+                }
             ) {
                 Text(
-                    formatCurrency(expense.amount),
+                    formatCurrency(kotlin.math.abs(expense.amount)),
                     modifier   = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     style      = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color      = MaterialTheme.colorScheme.error
+                    color      = if (isCredit) {
+                        androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
                 )
             }
         }
