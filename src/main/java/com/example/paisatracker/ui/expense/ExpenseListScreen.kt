@@ -8,11 +8,17 @@ import androidx.annotation.DrawableRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.PathEffect
@@ -319,59 +326,64 @@ fun ExpenseListScreen(
                 .background(backgroundGradient)
                 .padding(paddingValues)
         ) {
-            Column {
-                ExpenseSummaryHeader(expenses = expenses)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ExpenseViewTypeToggle(
-                        currentViewType = currentViewType,
-                        onViewTypeChange = { currentViewType = it }
-                    )
-
-                    SortDropdown(current = expenseSortOption, onChange = { expenseSortOption = it })
-                }
-
-                when (currentViewType) {
-                    ExpenseViewType.LIST -> {
-                        if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
-                            // Grouped view
-                            GroupedExpenseListView(
-                                yearGroups = visibleYearGroups,
-                                nextYearToLoad = nextYearToLoad,
-                                isLoadingYear = isLoadingYear,
-                                currencySymbol = category?.emoji ?: "₹",
-                                onAddExpenseClick = onAddNewExpenseClick,
-                                onExpenseClick = { navController.navigate("expense_details/${it.id}") },
-                                onEditClick = { expense ->
-                                    expenseToEditPrep(
-                                        expense,
-                                        onSetAmount = { editedExpenseAmount = it },
-                                        onSetDesc = { editedExpenseDescription = it },
-                                        onSetDate = { editedExpenseDate = it },
-                                        onSetMethod = { editedPaymentMethod = it }
-                                    )
-                                    editedExpenseImageUri = null
-                                    currentSheet = SheetState.Edit(expense)
-                                },
-                                onDeleteClick = { currentSheet = SheetState.Delete(it) },
-                                onLoadMoreClick = {
-                                    nextYearToLoad?.let { year ->
-                                        isLoadingYear = true
-                                        scope.launch {
-                                            loadedYears = loadedYears + year
-                                            isLoadingYear = false
-                                        }
+            when (currentViewType) {
+                ExpenseViewType.LIST -> {
+                    if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
+                        // Grouped view with collapsing header
+                        GroupedExpenseListViewWithCollapsingHeader(
+                            expenses = expenses,
+                            yearGroups = visibleYearGroups,
+                            nextYearToLoad = nextYearToLoad,
+                            isLoadingYear = isLoadingYear,
+                            currencySymbol = category?.emoji ?: "₹",
+                            currentViewType = currentViewType,
+                            onViewTypeChange = { currentViewType = it },
+                            expenseSortOption = expenseSortOption,
+                            onSortOptionChange = { expenseSortOption = it },
+                            onAddExpenseClick = onAddNewExpenseClick,
+                            onExpenseClick = { navController.navigate("expense_details/${it.id}") },
+                            onEditClick = { expense ->
+                                expenseToEditPrep(
+                                    expense,
+                                    onSetAmount = { editedExpenseAmount = it },
+                                    onSetDesc = { editedExpenseDescription = it },
+                                    onSetDate = { editedExpenseDate = it },
+                                    onSetMethod = { editedPaymentMethod = it }
+                                )
+                                editedExpenseImageUri = null
+                                currentSheet = SheetState.Edit(expense)
+                            },
+                            onDeleteClick = { currentSheet = SheetState.Delete(it) },
+                            onLoadMoreClick = {
+                                nextYearToLoad?.let { year ->
+                                    isLoadingYear = true
+                                    scope.launch {
+                                        loadedYears = loadedYears + year
+                                        isLoadingYear = false
                                     }
                                 }
-                            )
-                        } else {
-                            // Original flat list view
+                            }
+                        )
+                    } else {
+                        // Original flat list view with static header
+                        Column {
+                            ExpenseSummaryHeader(expenses = expenses)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ExpenseViewTypeToggle(
+                                    currentViewType = currentViewType,
+                                    onViewTypeChange = { currentViewType = it }
+                                )
+
+                                SortDropdown(current = expenseSortOption, onChange = { expenseSortOption = it })
+                            }
+
                             LazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
@@ -402,92 +414,117 @@ fun ExpenseListScreen(
                             }
                         }
                     }
-
-                    ExpenseViewType.GRID -> {
-                        if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
-                            // Grouped grid view
-                            GroupedExpenseGridView(
-                                yearGroups = visibleYearGroups,
-                                nextYearToLoad = nextYearToLoad,
-                                isLoadingYear = isLoadingYear,
-                                currencySymbol = category?.emoji ?: "₹",
-                                onAddExpenseClick = onAddNewExpenseClick,
-                                onExpenseClick = { navController.navigate("expense_details/${it.id}") },
-                                onEditClick = { expense ->
-                                    expenseToEditPrep(
-                                        expense,
-                                        onSetAmount = { editedExpenseAmount = it },
-                                        onSetDesc = { editedExpenseDescription = it },
-                                        onSetDate = { editedExpenseDate = it },
-                                        onSetMethod = { editedPaymentMethod = it }
-                                    )
-                                    editedExpenseImageUri = null
-                                    currentSheet = SheetState.Edit(expense)
-                                },
-                                onDeleteClick = { currentSheet = SheetState.Delete(it) },
-                                onLoadMoreClick = {
-                                    nextYearToLoad?.let { year ->
-                                        isLoadingYear = true
-                                        scope.launch {
-                                            loadedYears = loadedYears + year
-                                            isLoadingYear = false
-                                        }
+                }
+                ExpenseViewType.GRID -> {
+                    if (enableGrouping && expenseSortOption == SortOption.DATE_NEW_OLD && visibleYearGroups.isNotEmpty()) {
+                        // Grouped grid view with collapsing header
+                        GroupedExpenseGridViewWithCollapsingHeader(
+                            expenses = expenses,
+                            yearGroups = visibleYearGroups,
+                            nextYearToLoad = nextYearToLoad,
+                            isLoadingYear = isLoadingYear,
+                            currencySymbol = category?.emoji ?: "₹",
+                            currentViewType = currentViewType,
+                            onViewTypeChange = { currentViewType = it },
+                            expenseSortOption = expenseSortOption,
+                            onSortOptionChange = { expenseSortOption = it },
+                            onAddExpenseClick = onAddNewExpenseClick,
+                            onExpenseClick = { navController.navigate("expense_details/${it.id}") },
+                            onEditClick = { expense ->
+                                expenseToEditPrep(
+                                    expense,
+                                    onSetAmount = { editedExpenseAmount = it },
+                                    onSetDesc = { editedExpenseDescription = it },
+                                    onSetDate = { editedExpenseDate = it },
+                                    onSetMethod = { editedPaymentMethod = it }
+                                )
+                                editedExpenseImageUri = null
+                                currentSheet = SheetState.Edit(expense)
+                            },
+                            onDeleteClick = { currentSheet = SheetState.Delete(it) },
+                            onLoadMoreClick = {
+                                nextYearToLoad?.let { year ->
+                                    isLoadingYear = true
+                                    scope.launch {
+                                        loadedYears = loadedYears + year
+                                        isLoadingYear = false
                                     }
                                 }
-                            )
-                        } else {
+                            }
+                        )
+                    } else {
                             // Original flat grid view
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(
-                                    items = listItems.chunked(2)
-                                ) { rowItems ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        rowItems.forEach { expense ->
-                                            if (expense == null) {
-                                                AddExpenseGridItem(
-                                                    onClick = onAddNewExpenseClick,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            } else {
-                                                ExpenseGridItem(
-                                                    expense = expense,
-                                                    onClick = { navController.navigate("expense_details/${expense.id}") },
-                                                    onEditClick = {
-                                                        expenseToEditPrep(
-                                                            expense,
-                                                            onSetAmount = { editedExpenseAmount = it },
-                                                            onSetDesc = { editedExpenseDescription = it },
-                                                            onSetDate = { editedExpenseDate = it },
-                                                            onSetMethod = { editedPaymentMethod = it }
-                                                        )
-                                                        editedExpenseImageUri = null
-                                                        currentSheet = SheetState.Edit(expense)
-                                                    },
-                                                    onDeleteClick = { currentSheet = SheetState.Delete(expense) },
-                                                    modifier = Modifier.weight(1f)
-                                                )
+                            Column {
+                                ExpenseSummaryHeader(expenses = expenses)
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    ExpenseViewTypeToggle(
+                                        currentViewType = currentViewType,
+                                        onViewTypeChange = { currentViewType = it }
+                                    )
+
+                                    SortDropdown(current = expenseSortOption, onChange = { expenseSortOption = it })
+                                }
+
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    items(
+                                        items = listItems.chunked(2)
+                                    ) { rowItems ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            rowItems.forEach { expense ->
+                                                if (expense == null) {
+                                                    AddExpenseGridItem(
+                                                        onClick = onAddNewExpenseClick,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                } else {
+                                                    ExpenseGridItem(
+                                                        expense = expense,
+                                                        onClick = { navController.navigate("expense_details/${expense.id}") },
+                                                        onEditClick = {
+                                                            expenseToEditPrep(
+                                                                expense,
+                                                                onSetAmount = { editedExpenseAmount = it },
+                                                                onSetDesc = { editedExpenseDescription = it },
+                                                                onSetDate = { editedExpenseDate = it },
+                                                                onSetMethod = { editedPaymentMethod = it }
+                                                            )
+                                                            editedExpenseImageUri = null
+                                                            currentSheet = SheetState.Edit(expense)
+                                                        },
+                                                        onDeleteClick = { currentSheet = SheetState.Delete(expense) },
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
                                             }
-                                        }
-                                        if (rowItems.size == 1) {
-                                            Spacer(modifier = Modifier.weight(1f))
+                                            if (rowItems.size == 1) {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    }
                 }
+            }
+        }
 
-            // Show ModalBottomSheet when currentSheet != null
-            currentSheet?.let { sheet ->
+        // Show ModalBottomSheet when currentSheet != null
+        currentSheet?.let { sheet ->
                 ModalBottomSheet(onDismissRequest = { currentSheet = null }, sheetState = sheetState, tonalElevation = 10.dp) {
                     Box(modifier = Modifier
                         .fillMaxWidth()
@@ -611,8 +648,6 @@ fun ExpenseListScreen(
                 }
             }
         }
-    }
-}
 
 @Composable
 fun AddExpenseListItem(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -1306,6 +1341,7 @@ private fun String?.toPaymentIconKey(): String? = when (this) {
     else -> null
 }
 // Grouped Expense List View
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupedExpenseListView(
     yearGroups: List<YearGroup>,
@@ -1318,7 +1354,18 @@ private fun GroupedExpenseListView(
     onDeleteClick: (Expense) -> Unit,
     onLoadMoreClick: () -> Unit
 ) {
+    val listState = rememberLazyListState()
+    
+    // Track if we should show collapsed header (when scrolled past first item)
+    val isHeaderCollapsed by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+            (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset > 50)
+        }
+    }
+    
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1339,9 +1386,9 @@ private fun GroupedExpenseListView(
             
             // Month groups within the year
             yearGroup.monthGroups.forEach { monthGroup ->
-                // Month header
-                item(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
-                    CompactMonthHeader(
+                // Sticky Month header
+                stickyHeader(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
+                    StickyMonthHeader(
                         monthGroup = monthGroup,
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
@@ -1378,6 +1425,7 @@ private fun GroupedExpenseListView(
 
 
 // Grouped Expense Grid View
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun GroupedExpenseGridView(
     yearGroups: List<YearGroup>,
