@@ -99,7 +99,7 @@ fun ProjectDetailsScreen(
     val projectSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val project by viewModel.getProjectById(projectId).collectAsState(initial = null)
-    val totalSpent = categoriesWithTotal.sumOf { it.totalAmount }
+    val totalSpent = categoriesWithTotal.sumOf { kotlin.math.abs(it.totalAmount) }
 
     val sortedCategories = remember(categoriesWithTotal, sortOption) {
         when (sortOption) {

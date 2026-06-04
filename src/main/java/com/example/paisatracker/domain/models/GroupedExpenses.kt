@@ -57,14 +57,14 @@ fun List<Expense>.groupByYearAndMonth(): List<YearGroup> {
                 year = year,
                 month = month,
                 expenses = monthExpenses.sortedByDescending { it.date },
-                totalAmount = monthExpenses.sumOf { it.amount }
+                totalAmount = monthExpenses.filter { it.amount > 0 }.sumOf { it.amount }
             )
         }.sortedByDescending { it.month } // Sort months descending (newest first)
         
         YearGroup(
             year = year,
             monthGroups = monthGroups,
-            totalAmount = yearExpenses.sumOf { it.amount },
+            totalAmount = yearExpenses.filter { it.amount > 0 }.sumOf { it.amount },
             expenseCount = yearExpenses.size
         )
     }.sortedByDescending { it.year } // Sort years descending (newest first)

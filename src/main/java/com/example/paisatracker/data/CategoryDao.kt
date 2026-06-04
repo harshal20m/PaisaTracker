@@ -14,6 +14,7 @@ data class CategoryWithTotal(
     val category: Category,
     val totalAmount: Double,
     val expenseCount: Int,
+    val creditCount: Int = 0,
     val latestExpenseTime: Long? = null
 )
 
@@ -47,8 +48,9 @@ interface CategoryDao {
     @Query("""
     SELECT
         c.*,
-        COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) AS totalAmount,
+        COALESCE(SUM(e.amount), 0.0) AS totalAmount,
         COUNT(CASE WHEN e.amount > 0 THEN e.id END) AS expenseCount,
+        COUNT(CASE WHEN e.amount < 0 THEN e.id END) AS creditCount,
         MAX(e.date) AS latestExpenseTime
     FROM categories c
     LEFT JOIN expenses e ON c.id = e.categoryId

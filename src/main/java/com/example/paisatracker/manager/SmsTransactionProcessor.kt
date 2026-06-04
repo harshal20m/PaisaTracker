@@ -37,7 +37,6 @@ class SmsTransactionProcessor(
 ) {
     companion object {
         private const val TAG = "SmsTransactionProcessor"
-        private const val DEFAULT_CATEGORY_NAME = "Others"
     }
 
     /**
@@ -137,8 +136,19 @@ class SmsTransactionProcessor(
                     val autoCreate = smsPreferences.getAutoCreateExpenses()
                     
                     if (autoCreate) {
-                        // Auto-create mode: Create expense immediately
-                        return createExpenseFromTransaction(parsedTransaction, sender, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
+                        // Check if default category/project is set OR merchant rules are enabled
+                        val hasDefaultCategory = smsPreferences.getDefaultCategoryId() != null
+                        val useMerchantRules = smsPreferences.getUseMerchantRules()
+                        
+                        // Only auto-create if we have a valid destination (default or merchant rule)
+                        if (hasDefaultCategory || useMerchantRules) {
+                            // Auto-create mode: Create expense immediately
+                            return createExpenseFromTransaction(parsedTransaction, sender, smsBody, timestamp, SmsTransactionStatus.AUTO_CREATED)
+                        } else {
+                            // No default set - save as pending instead
+                            Log.d(TAG, "Auto-create enabled but no default category set. Saving as pending.")
+                            return savePendingTransaction(parsedTransaction, sender, smsBody, timestamp)
+                        }
                     } else {
                         // Manual mode: Save as pending for user confirmation
                         return savePendingTransaction(parsedTransaction, sender, smsBody, timestamp)
@@ -344,11 +354,13 @@ class SmsTransactionProcessor(
                 projectId = smsPreferences.getDefaultProjectId()
             }
             
-            // If still no category, get or create one based on merchant name
+            // Get the category - must exist (either from rule or default)
             val category = if (categoryId != null && categoryId != 0L) {
-                categoryDao.getCategoryByIdSync(categoryId) ?: getOrCreateCategory(parsedTransaction.merchant)
+                categoryDao.getCategoryByIdSync(categoryId)
+                    ?: throw IllegalStateException("Category with ID $categoryId not found")
             } else {
-                getOrCreateCategory(parsedTransaction.merchant)
+                // This should never happen due to the check in saveParsedTransaction
+                throw IllegalStateException("No category ID available for auto-created expense")
             }
             
             // Try to find matching bank account for automatic debit
@@ -417,51 +429,6 @@ class SmsTransactionProcessor(
         }
     }
 
-    /**
-     * Get or create a category for the transaction
-     */
-    private suspend fun getOrCreateCategory(categoryName: String?): Category {
-        val name = categoryName ?: DEFAULT_CATEGORY_NAME
-        
-        // Try to find existing category by name
-        val existingCategory = categoryDao.getCategoryByName(name)
-        if (existingCategory != null) {
-            return existingCategory
-        }
-
-        // Get default project (first project or create one)
-        val defaultProject = categoryDao.getDefaultProject() 
-            ?: throw IllegalStateException("No default project found. Please create a project first.")
-
-        // Create new category
-        val newCategory = Category(
-            name = name,
-            projectId = defaultProject.id,
-            emoji = getCategoryEmoji(name)
-        )
-        
-        val categoryId = categoryDao.insert(newCategory)
-        return newCategory.copy(id = categoryId)
-    }
-
-    /**
-     * Get emoji for category based on name
-     */
-    private fun getCategoryEmoji(categoryName: String): String {
-        return when (categoryName.lowercase()) {
-            "food", "food & dining", "restaurant" -> "🍽️"
-            "shopping", "retail" -> "🛍️"
-            "transport", "transportation", "travel" -> "🚗"
-            "entertainment" -> "🎬"
-            "groceries", "grocery" -> "🛒"
-            "health", "medical" -> "🏥"
-            "utilities", "bills" -> "💡"
-            "education" -> "📚"
-            "fuel", "petrol" -> "⛽"
-            "others" -> "📦"
-            else -> "💰"
-        }
-    }
 
     /**
      * Generate a unique hash for the transaction to detect duplicates
@@ -532,13 +499,12 @@ class SmsTransactionProcessor(
             val amount = notification.amount ?: 0.0
             val isCredit = notification.status == SmsTransactionStatus.CREDIT_PENDING
 
-            // Get or create category
+            // Get category - must be provided by user when confirming
             val category = if (categoryId != null) {
                 categoryDao.getCategoryByIdSync(categoryId)
                     ?: return ProcessingResult(false, reason = "Category not found")
             } else {
-                // Use default "Uncategorized" category instead of creating new ones
-                getOrCreateCategory(DEFAULT_CATEGORY_NAME)
+                return ProcessingResult(false, reason = "Category must be selected when confirming transaction")
             }
 
             // Create expense - use negative amount for credits (income)

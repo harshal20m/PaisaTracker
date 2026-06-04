@@ -932,7 +932,10 @@ fun ExpenseBottomSheetContent(
 
 @Composable
 fun ExpenseSummaryHeader(expenses: List<Expense>) {
-    val totalAmount = expenses.sumOf { it.amount }
+    val totalExpenses = expenses.filter { it.amount > 0 }.sumOf { it.amount }
+    val totalCredits = expenses.filter { it.amount < 0 }.sumOf { kotlin.math.abs(it.amount) }
+    val expenseCount = expenses.count { it.amount > 0 }
+    val creditCount = expenses.count { it.amount < 0 }
 
     Card(
         modifier = Modifier
@@ -951,16 +954,29 @@ fun ExpenseSummaryHeader(expenses: List<Expense>) {
         ) {
             Column {
                 Text(
-                    text = "Total Spent",
+                    text = "Total Spending",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = formatCurrency(totalAmount),
+                    text = formatCurrency(totalExpenses),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val countsText = buildString {
+                    if (expenseCount > 0) append("$expenseCount expense${if (expenseCount != 1) "s" else ""}")
+                    if (creditCount > 0) {
+                        if (expenseCount > 0) append(" • ")
+                        append("$creditCount credit${if (creditCount != 1) "s" else ""} (${formatCurrency(totalCredits)})")
+                    }
+                }
+                Text(
+                    text = countsText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
             }
             Surface(
