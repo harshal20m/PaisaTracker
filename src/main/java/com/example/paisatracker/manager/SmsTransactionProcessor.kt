@@ -97,6 +97,44 @@ class SmsTransactionProcessor(
     }
 
     /**
+     * Detects the payment method from parsed transaction data.
+     * Priority: 1) Card detection from parser, 2) Merchant/description inference, 3) Default to UPI
+     */
+    private fun detectPaymentMethod(parsedTransaction: ParsedTransaction): String {
+        // Check if transaction is from card (parser provides this)
+        if (parsedTransaction.isFromCard) {
+            return "Card"
+        }
+        
+        // Infer from merchant name or description
+        val description = (parsedTransaction.merchant ?: "").lowercase()
+        
+        return when {
+            description.contains("phonepe") -> "PhonePe"
+            description.contains("gpay") || description.contains("google pay") -> "GPay"
+            description.contains("paytm") -> "Paytm"
+            description.contains("card") || description.contains("debit") || description.contains("credit") -> "Card"
+            description.contains("cash") -> "Cash"
+            description.contains("upi") -> "UPI"
+            // Default: Most SMS transactions are UPI in India
+            else -> "UPI"
+        }
+    }
+
+    /**
+     * Maps payment method name to icon key for display
+     */
+    private fun String?.toPaymentIconKey(): String? = when (this) {
+        "UPI" -> "UPI"
+        "PhonePe" -> "PhonePe"
+        "GPay" -> "GPay"
+        "Paytm" -> "Paytm"
+        "Cash" -> "Cash"
+        "Card" -> "Card"
+        else -> null
+    }
+
+    /**
      * Saves a parsed transaction - either as pending or auto-creates expense based on settings
      */
     private suspend fun saveParsedTransaction(
@@ -371,14 +409,17 @@ class SmsTransactionProcessor(
                 null
             }
             
+            // Detect actual payment method from transaction
+            val detectedPaymentMethod = detectPaymentMethod(parsedTransaction)
+            
             // Create expense with bank account link
             val expense = Expense(
                 amount = parsedTransaction.amount.toDouble(),
                 date = timestamp,
                 description = parsedTransaction.merchant ?: "SMS Transaction",
                 categoryId = category.id,
-                paymentMethod = parsedTransaction.bankName,
-                paymentIcon = "🏦",
+                paymentMethod = detectedPaymentMethod,
+                paymentIcon = detectedPaymentMethod.toPaymentIconKey(),
                 bankAccountId = bankAccount?.id
             )
 
@@ -507,14 +548,27 @@ class SmsTransactionProcessor(
                 return ProcessingResult(false, reason = "Category must be selected when confirming transaction")
             }
 
+            // Infer payment method from merchant name
+            val inferredMethod = when {
+                notification.merchant?.lowercase()?.contains("phonepe") == true -> "PhonePe"
+                notification.merchant?.lowercase()?.contains("gpay") == true -> "GPay"
+                notification.merchant?.lowercase()?.contains("google pay") == true -> "GPay"
+                notification.merchant?.lowercase()?.contains("paytm") == true -> "Paytm"
+                notification.merchant?.lowercase()?.contains("card") == true -> "Card"
+                notification.merchant?.lowercase()?.contains("debit") == true -> "Card"
+                notification.merchant?.lowercase()?.contains("credit") == true -> "Card"
+                notification.merchant?.lowercase()?.contains("cash") == true -> "Cash"
+                else -> "UPI"
+            }
+            
             // Create expense - use negative amount for credits (income)
             val expense = Expense(
                 amount = if (isCredit) -amount else amount,  // Negative for credits
                 date = notification.postedAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
                 description = notification.merchant ?: "SMS Transaction",
                 categoryId = category.id,
-                paymentMethod = notification.bankName,
-                paymentIcon = "🏦"
+                paymentMethod = inferredMethod,
+                paymentIcon = inferredMethod.toPaymentIconKey()
             )
 
             val expenseId = expenseDao.insert(expense)

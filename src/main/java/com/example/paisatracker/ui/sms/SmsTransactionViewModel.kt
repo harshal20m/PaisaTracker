@@ -324,6 +324,13 @@ class SmsTransactionViewModel(
         }
     }
     
+    /**
+     * Get a notification by ID
+     */
+    suspend fun getNotificationById(notificationId: Long): BankNotificationEntity? {
+        return bankNotificationRepository.getById(notificationId)
+    }
+    
     companion object {
         private const val TAG = "SmsTransactionViewModel"
     }

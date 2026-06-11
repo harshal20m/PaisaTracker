@@ -6,12 +6,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +41,15 @@ fun PendingSmsCompactCard(
     val pendingTransactions by viewModel.pendingTransactions
         .collectAsStateWithLifecycle(initialValue = emptyList())
     var selectedTransaction by remember { mutableStateOf<BankNotificationEntity?>(null) }
+    var isExpanded by remember { mutableStateOf(false) }
+    var displayCount by remember { mutableStateOf(2) }
+    
+    // Reset display count when transactions change
+    LaunchedEffect(pendingTransactions.size) {
+        if (!isExpanded) {
+            displayCount = 2
+        }
+    }
 
     AnimatedVisibility(
         visible  = pendingTransactions.isNotEmpty(),
@@ -112,40 +126,108 @@ fun PendingSmsCompactCard(
                     }
                 }
 
-                // ── Transaction rows (max 2) ───────────────────────────────────
-                pendingTransactions.take(2).forEachIndexed { index, txn ->
-                    if (index > 0) {
+                // ── Transaction rows (scrollable with load more) ──────────────
+                val transactionsToShow = if (isExpanded) {
+                    pendingTransactions.take(displayCount)
+                } else {
+                    pendingTransactions.take(2)
+                }
+                
+                // Scrollable list when expanded
+                if (isExpanded) {
+                    val listState = rememberLazyListState()
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                    ) {
+                        items(transactionsToShow) { txn ->
+                            val index = transactionsToShow.indexOf(txn)
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier  = Modifier.padding(horizontal = 16.dp),
+                                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    thickness = 0.5.dp
+                                )
+                            }
+                            CompactTransactionRow(
+                                transaction = txn,
+                                onConfirm   = { selectedTransaction = txn },
+                                onReject    = { viewModel.rejectTransaction(txn.id) },
+                                onClick     = { navController.navigate("sms_notification_detail/${txn.id}") }
+                            )
+                        }
+                        
+                        // Load more button inside the list
+                        if (displayCount < pendingTransactions.size) {
+                            item {
+                                HorizontalDivider(
+                                    modifier  = Modifier.padding(horizontal = 16.dp),
+                                    color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    thickness = 0.5.dp
+                                )
+                                TextButton(
+                                    onClick = { displayCount += 5 },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Load ${minOf(5, pendingTransactions.size - displayCount)} more",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Compact view (first 2 items)
+                    transactionsToShow.forEachIndexed { index, txn ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                modifier  = Modifier.padding(horizontal = 16.dp),
+                                color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                thickness = 0.5.dp
+                            )
+                        }
+                        CompactTransactionRow(
+                            transaction = txn,
+                            onConfirm   = { selectedTransaction = txn },
+                            onReject    = { viewModel.rejectTransaction(txn.id) },
+                            onClick     = { navController.navigate("sms_notification_detail/${txn.id}") }
+                        )
+                    }
+                    
+                    // Expand button
+                    if (pendingTransactions.size > 2) {
                         HorizontalDivider(
                             modifier  = Modifier.padding(horizontal = 16.dp),
                             color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                             thickness = 0.5.dp
                         )
-                    }
-                    CompactTransactionRow(
-                        transaction = txn,
-                        onConfirm   = { selectedTransaction = txn },
-                        onReject    = { viewModel.rejectTransaction(txn.id) }
-                    )
-                }
-
-                // ── Overflow indicator ────────────────────────────────────────
-                if (pendingTransactions.size > 2) {
-                    HorizontalDivider(
-                        modifier  = Modifier.padding(horizontal = 16.dp),
-                        color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        thickness = 0.5.dp
-                    )
-                    Box(
-                        modifier         = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text     = "+${pendingTransactions.size - 2} more transaction${if (pendingTransactions.size - 2 != 1) "s" else ""}",
-                            fontSize = 12.sp,
-                            color    = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
+                        TextButton(
+                            onClick = {
+                                isExpanded = true
+                                displayCount = minOf(pendingTransactions.size, 7)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "+${pendingTransactions.size - 2} more • Tap to expand",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
 
@@ -195,11 +277,13 @@ fun PendingSmsCompactCard(
 private fun CompactTransactionRow(
     transaction : BankNotificationEntity,
     onConfirm   : () -> Unit,
-    onReject    : () -> Unit
+    onReject    : () -> Unit,
+    onClick     : () -> Unit = {}
 ) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically

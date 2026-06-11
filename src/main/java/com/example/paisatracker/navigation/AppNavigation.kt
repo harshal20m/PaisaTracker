@@ -208,5 +208,16 @@ fun AppNavigation(
                 viewModel = smsHistoryScanViewModel
             )
         }
+        composable("sms_notification_detail/{notificationId}") { backStackEntry ->
+            val notificationId = backStackEntry.arguments?.getString("notificationId")?.toLongOrNull() ?: 0L
+            val context = LocalContext.current
+            val application = context.applicationContext as PaisaTrackerApplication
+            val smsViewModel = com.example.paisatracker.ui.sms.SmsTransactionViewModel(application, viewModel)
+            com.example.paisatracker.ui.sms.SmsNotificationDetailScreen(
+                notificationId = notificationId,
+                viewModel = smsViewModel,
+                navController = navController
+            )
+        }
     }
 }

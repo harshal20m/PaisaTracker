@@ -312,12 +312,12 @@ private fun EditExpenseSheetContent(
 }
 
 private fun String.toIconKey(): String? = when (this) {
-    "GPay"    -> "gpay"
-    "PhonePe" -> "phonepe"
-    "Paytm"   -> "paytm"
-    "Cash"    -> "cash"
-    "Card"    -> "card"
-    "UPI"     -> "upi"
+    "GPay"    -> "GPay"
+    "PhonePe" -> "PhonePe"
+    "Paytm"   -> "Paytm"
+    "Cash"    -> "Cash"
+    "Card"    -> "Card"
+    "UPI"     -> "UPI"
     else      -> null
 }
 
