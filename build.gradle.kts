@@ -13,6 +13,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -61,6 +62,15 @@ android {
         versionName = "v4.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Load analytics flag from local.properties
+        val localProperties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localProperties.load(FileInputStream(localPropertiesFile))
+        }
+        val analyticsEnabled = localProperties.getProperty("analytics.enabled", "false")
+        buildConfigField("boolean", "ANALYTICS_ENABLED", analyticsEnabled)
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -71,6 +81,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -134,4 +145,8 @@ dependencies {
     implementation("androidx.glance:glance:1.1.1")
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.glance:glance-material3:1.1.1")
+    
+    // Firebase Analytics (Only if enabled)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
 }

@@ -28,6 +28,7 @@
 - [Widgets](#-home-screen-widgets)
 - [Security Features](#-security-features)
 - [Data Management](#-data-management)
+- [Analytics & Privacy](#-analytics--privacy)
 - [Installation](#-installation)
 - [Building from Source](#-building-from-source)
 - [Project Structure](#-project-structure)
@@ -44,7 +45,8 @@
 ### Key Highlights
 
 - **100% Offline**: No internet required for core functionality
-- **Zero Tracking**: Your data never leaves your device
+- **Privacy-First**: Your financial data never leaves your device
+- **Transparent Analytics**: Optional, developer-only analytics (disabled by default for users)
 - **Modern UI**: Material 3 design with dynamic theming
 - **Multi-Project Support**: Organize expenses across different life areas
 - **Bank Account Integration**: Track balances across multiple accounts
@@ -997,6 +999,67 @@ Contributions are welcome! Here's how you can help:
 - **State**: Use `collectAsStateWithLifecycle()`
 - **Previews**: Every `@Composable` must have `@Preview`
 - **Documentation**: KDoc for public APIs
+
+---
+
+## 📊 Analytics & Privacy
+
+### Privacy-First Analytics
+
+PaisaTracker includes **optional, developer-only analytics** to help understand app usage patterns. This is implemented with strict privacy controls:
+
+#### What We Collect (Developer Only)
+- ✅ App opens and active user count (anonymous)
+- ✅ Aggregated feature usage (e.g., total projects created)
+- ✅ Widget usage statistics
+- ✅ Backup/restore events
+
+#### What We DON'T Collect
+- ❌ **No transaction amounts**
+- ❌ **No expense descriptions**
+- ❌ **No category or project names**
+- ❌ **No personal information**
+- ❌ **No financial data**
+- ❌ **No location data**
+
+### For End Users
+- Analytics is **completely invisible** to end users
+- No data collection prompts or dialogs
+- Your financial data **never leaves your device**
+- The app works identically with or without analytics
+
+### For Contributors & Open Source Builds
+Analytics is **disabled by default** for contributors:
+
+1. **Default Configuration**: `analytics.enabled=false` in `local.properties`
+2. **Dummy Config Included**: Project includes dummy `google-services.json` for building
+3. **No Firebase Required**: Build and run without any Firebase setup
+4. **Zero Overhead**: When disabled, analytics code has no runtime impact
+
+### Setup Instructions
+
+#### Building Without Analytics (Default)
+```bash
+# Clone the repository
+git clone https://github.com/harshal20m/PaisaTracker.git
+cd PaisaTracker
+
+# Build normally - analytics is disabled by default
+./gradlew assembleDebug
+```
+
+#### Enabling Analytics (Developer Only)
+See [ANALYTICS_SETUP.md](ANALYTICS_SETUP.md) for detailed instructions on:
+- Setting up Firebase project
+- Configuring `google-services.json`
+- Enabling analytics in `local.properties`
+- Viewing analytics dashboard
+
+### Transparency Commitment
+- All analytics code is open source and auditable
+- Analytics implementation is documented in `AnalyticsManager.kt`
+- No third-party tracking SDKs beyond Firebase Analytics
+- Complies with GDPR and privacy best practices
 
 ---
 

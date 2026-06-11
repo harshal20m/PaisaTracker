@@ -30,6 +30,10 @@ coverage/
 htmlcov/
 .coverage
 
+# Firebase & Analytics (Keep template, ignore actual config)
+google-services.json
+!google-services.json.template
+
 # Python specific (if applicable)
 __pycache__/
 *.pyc

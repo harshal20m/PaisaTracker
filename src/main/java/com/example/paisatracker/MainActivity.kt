@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.paisatracker.analytics.AnalyticsManager
 import com.example.paisatracker.data.AppLockPreferences
 import com.example.paisatracker.data.AppTheme
 import com.example.paisatracker.data.DataSeeder
@@ -39,6 +40,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     private val updateManager by lazy { UpdateManager(this) }
+    private val analyticsManager by lazy { AnalyticsManager.getInstance(this) }
 
     private val viewModel: PaisaTrackerViewModel by viewModels {
         PaisaTrackerViewModelFactory(
@@ -84,6 +86,9 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Log app opened event
+        analyticsManager.logAppOpened()
+
         if (savedInstanceState == null) {
             lifecycleScope.launch {
                 val isAppLockEnabled = appLockPrefs.isAppLockEnabled.first()
@@ -94,6 +99,9 @@ class MainActivity : FragmentActivity() {
                 if (needsSetup) {
                     showAppTour = true
                 }
+                
+                // Update analytics user properties
+                updateAnalyticsProperties()
             }
         }
 
@@ -279,6 +287,38 @@ class MainActivity : FragmentActivity() {
                 startActivity(intent)
             } catch (e: Exception) {
                 // Silently fail
+            }
+        }
+    }
+    
+    /**
+     * Update analytics with aggregated user properties
+     * This is called periodically to keep analytics data current
+     */
+    private fun updateAnalyticsProperties() {
+        lifecycleScope.launch {
+            try {
+                val repository = (application as PaisaTrackerApplication).repository
+                
+                // Get aggregated counts (no personal data)
+                val totalProjects = repository.getAllProjects().first().size
+                val totalCategories = repository.getAllCategories().first().size
+                val totalExpenses = repository.getAllExpenses().first().size
+                val hasAppLock = appLockPrefs.isAppLockEnabled.first()
+                
+                // Widget count would need to be tracked separately
+                // For now, we'll use 0 as placeholder
+                val widgetsCount = 0
+                
+                analyticsManager.updateUserProperties(
+                    totalProjects = totalProjects,
+                    totalCategories = totalCategories,
+                    totalExpenses = totalExpenses,
+                    hasAppLock = hasAppLock,
+                    widgetsCount = widgetsCount
+                )
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to update analytics properties", e)
             }
         }
     }
