@@ -26,4 +26,4 @@
 -dontwarn com.google.android.gms.**
 
 # Keep Analytics Manager
--keep class com.example.paisatracker.analytics.AnalyticsManager { *; }
+-keep class com.h4rsh41.paisatracker.analytics.AnalyticsManager { *; }

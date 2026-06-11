@@ -17,7 +17,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.paisatracker"
+    namespace = "com.h4rsh41.paisatracker"
     compileSdk = 36
 
     signingConfigs {

@@ -1,4 +1,4 @@
-package com.example.paisatracker
+package com.h4rsh41.paisatracker
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

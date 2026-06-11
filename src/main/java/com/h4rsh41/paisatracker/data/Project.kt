@@ -1,0 +1,16 @@
+package com.h4rsh41.paisatracker.data
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "projects")
+data class Project(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val emoji: String = "📁",
+    val createdAt: Long = System.currentTimeMillis(),
+    val lastModified: Long = System.currentTimeMillis(),
+    val isCompleted: Boolean = false,
+    val includeInSalary: Boolean = true  // New field: Include this project in salary calculations
+)
+

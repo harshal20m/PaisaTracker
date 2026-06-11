@@ -1,4 +1,4 @@
-package com.example.paisatracker
+package com.h4rsh41.paisatracker
 
 import org.junit.Test
 
