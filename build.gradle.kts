@@ -55,7 +55,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.paisatracker"
+        applicationId = "com.h4rsh41.paisatracker"
         minSdk = 28
         targetSdk = 36
         versionCode = 4

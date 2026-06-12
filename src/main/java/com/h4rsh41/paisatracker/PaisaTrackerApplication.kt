@@ -6,6 +6,7 @@ import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.h4rsh41.paisatracker.analytics.AnalyticsManager
 import com.h4rsh41.paisatracker.data.CurrencyPreferencesRepository
 import com.h4rsh41.paisatracker.data.MerchantRuleRepository
 import com.h4rsh41.paisatracker.data.PaisaTrackerDatabase
@@ -15,11 +16,17 @@ import com.h4rsh41.paisatracker.util.CurrentCurrency
 import com.h4rsh41.paisatracker.util.ExpenseReminderWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class PaisaTrackerApplication : Application() {
+    
+    // Analytics Manager (Lazy initialization)
+    val analyticsManager: AnalyticsManager by lazy {
+        AnalyticsManager.getInstance(this)
+    }
     val database: PaisaTrackerDatabase by lazy { PaisaTrackerDatabase.getDatabase(this) }
     val repository: PaisaTrackerRepository by lazy {
         PaisaTrackerRepository(
@@ -47,6 +54,10 @@ class PaisaTrackerApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize Analytics Manager
+        analyticsManager.logAppOpened()
+        
         scheduleDailyReminder()
 
         // Initialize currency from preferences
@@ -58,6 +69,35 @@ class PaisaTrackerApplication : Application() {
         
         // Seed default merchant rules on first app launch
         seedDefaultMerchantRules()
+        
+        // Update user properties for analytics
+        updateAnalyticsUserProperties()
+    }
+    
+    private fun updateAnalyticsUserProperties() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val projects = repository.getAllProjects().firstOrNull() ?: emptyList()
+                val categories = repository.getAllCategories().firstOrNull() ?: emptyList()
+                val expenses = repository.getAllExpenses().firstOrNull() ?: emptyList()
+                
+                val sharedPrefs = getSharedPreferences("app_lock_prefs", Context.MODE_PRIVATE)
+                val hasAppLock = sharedPrefs.getBoolean("app_lock_enabled", false)
+                
+                // Widget count would need to be tracked separately
+                // For now, we'll use 0 as a placeholder
+                analyticsManager.updateUserProperties(
+                    totalProjects = projects.size,
+                    totalCategories = categories.size,
+                    totalExpenses = expenses.size,
+                    hasAppLock = hasAppLock,
+                    widgetsCount = 0
+                )
+            } catch (e: Exception) {
+                // Silently fail - analytics should never crash the app
+                e.printStackTrace()
+            }
+        }
     }
     
     private fun seedDefaultMerchantRules() {
