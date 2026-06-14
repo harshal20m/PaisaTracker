@@ -25,9 +25,16 @@ import com.google.firebase.ktx.Firebase
 class AnalyticsManager private constructor(context: Context) {
     
     private val analytics: FirebaseAnalytics? = if (BuildConfig.ANALYTICS_ENABLED) {
-        Firebase.analytics.apply {
-            // Disable automatic screen tracking to have full control
-            setAnalyticsCollectionEnabled(true)
+        try {
+            Firebase.analytics.apply {
+                // Disable automatic screen tracking to have full control
+                setAnalyticsCollectionEnabled(true)
+            }
+        } catch (e: Exception) {
+            // Firebase not configured properly (e.g., missing google-services.json)
+            // This is expected for debug builds and open-source contributors
+            e.printStackTrace()
+            null
         }
     } else {
         null

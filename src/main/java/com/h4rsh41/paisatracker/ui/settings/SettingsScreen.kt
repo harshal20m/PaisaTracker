@@ -30,6 +30,7 @@ import com.h4rsh41.paisatracker.PaisaTrackerApplication
 import com.h4rsh41.paisatracker.PaisaTrackerViewModel
 import com.h4rsh41.paisatracker.data.AppLockPreferences
 import com.h4rsh41.paisatracker.data.CurrencyPreferencesRepository
+import com.h4rsh41.paisatracker.data.FlapPreferencesRepository
 import com.h4rsh41.paisatracker.ui.applock.AppLockSettingsSheet
 import com.h4rsh41.paisatracker.ui.applock.SetupPinSheet
 import com.h4rsh41.paisatracker.ui.export.ExportBottomSheet
@@ -61,6 +62,7 @@ fun SettingsScreen(
     var showCurrencyDialog        by remember { mutableStateOf(false) }
     var showDefaultDataDialog     by remember { mutableStateOf(false) }
     var showDataManagement        by remember { mutableStateOf(false) }
+    var showFlapSettings          by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -71,6 +73,11 @@ fun SettingsScreen(
     var showAppLockDialog   by remember { mutableStateOf(false) }
 
     val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
+
+    val flapPrefs = remember { FlapPreferencesRepository.getInstance(context) }
+    val isFlapEnabled by flapPrefs.isFlapEnabled.collectAsState(initial = true)
+    val flapPosition by flapPrefs.flapPosition.collectAsState(initial = com.h4rsh41.paisatracker.data.FlapPosition.RIGHT)
+    val flapDefaultTab by flapPrefs.flapDefaultTab.collectAsState(initial = com.h4rsh41.paisatracker.data.FlapDefaultTab.CALCULATOR)
 
 
 
@@ -132,6 +139,18 @@ fun SettingsScreen(
                     title    = "Currency",
                     subtitle = "${selectedCurrency.flag} ${selectedCurrency.code}",
                     onClick  = { showCurrencyDialog = true }
+                )
+            }
+
+            item(span = StaggeredGridItemSpan.FullLine) { MasonryLabel("Quick Access") }
+
+            item {
+                MasonryCard(
+                    icon     = Icons.Default.Calculate,
+                    title    = "Flap Settings",
+                    subtitle = if (isFlapEnabled) "${flapPosition.value.replaceFirstChar { it.uppercase() }} side" else "Disabled",
+                    badge    = if (isFlapEnabled) "On" else null,
+                    onClick  = { showFlapSettings = true }
                 )
             }
 
@@ -346,6 +365,17 @@ fun SettingsScreen(
                 viewModel.showToast("Currency updated to ${it.code}")
                 showCurrencyDialog = false 
             }
+        )
+    }
+
+    if (showFlapSettings) {
+        FlapSettingsBottomSheet(
+            viewModel = viewModel,
+            flapPrefs = flapPrefs,
+            isFlapEnabled = isFlapEnabled,
+            flapPosition = flapPosition,
+            flapDefaultTab = flapDefaultTab,
+            onDismiss = { showFlapSettings = false }
         )
     }
 }

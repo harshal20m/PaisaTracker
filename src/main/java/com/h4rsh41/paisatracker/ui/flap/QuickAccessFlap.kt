@@ -11,7 +11,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -37,9 +39,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
@@ -52,12 +57,17 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.h4rsh41.paisatracker.PaisaTrackerViewModel
+import com.h4rsh41.paisatracker.data.FlapPosition
+import com.h4rsh41.paisatracker.data.FlapPreferencesRepository
+import com.h4rsh41.paisatracker.ui.settings.FlapSettingsBottomSheet
+import kotlinx.coroutines.launch
 
 // ──────────────────────────────────────────────────────────────────────────────
 //  QuickAccessFlap - Draggable & Resizable Game Bar Style
@@ -78,6 +88,26 @@ private val VERTICAL_PADDING = 60.dp // Safe area padding for top/bottom
 fun QuickAccessFlap(
     viewModel: PaisaTrackerViewModel,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    // Flap preferences
+    val flapPrefs = remember { FlapPreferencesRepository.getInstance(context) }
+    val isFlapEnabled by flapPrefs.isFlapEnabled.collectAsState(initial = true)
+    val flapPosition by flapPrefs.flapPosition.collectAsState(initial = FlapPosition.RIGHT)
+    val flapDefaultTab by flapPrefs.flapDefaultTab.collectAsState(initial = com.h4rsh41.paisatracker.data.FlapDefaultTab.CALCULATOR)
+    
+    // Show settings dialog
+    var showFlapSettings by remember { mutableStateOf(false) }
+    
+    // Set default tab when flap opens
+    LaunchedEffect(flapDefaultTab) {
+        viewModel.flapSelectedTab.value = when (flapDefaultTab) {
+            com.h4rsh41.paisatracker.data.FlapDefaultTab.CALCULATOR -> 0
+            com.h4rsh41.paisatracker.data.FlapDefaultTab.NOTES -> 1
+        }
+    }
+    
     val isExpanded by viewModel.isFlapExpanded.collectAsStateWithLifecycle()
     val selectedTab by viewModel.flapSelectedTab.collectAsStateWithLifecycle()
     // ✅ Collect persisted offset from ViewModel
@@ -86,6 +116,7 @@ fun QuickAccessFlap(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val screenHeightDp = configuration.screenHeightDp.dp
+    val screenWidthDp = configuration.screenWidthDp.dp
 
     // ✅ Dynamic bounds calculation based on screen height
     val collapsedButtonSize = COLLAPSED_SIZE
@@ -159,19 +190,47 @@ fun QuickAccessFlap(
         }
         clampedOffset
     }
+    
+    // Track horizontal drag for switching sides
+    var horizontalDragDelta by remember { mutableStateOf(0f) }
+    val dragThreshold = with(density) { 100.dp.toPx() } // Threshold to switch sides
+
+    // Don't render if flap is disabled
+    if (!isFlapEnabled) {
+        return
+    }
+    
+    // Show settings dialog
+    if (showFlapSettings) {
+        FlapSettingsBottomSheet(
+            viewModel = viewModel,
+            flapPrefs = flapPrefs,
+            isFlapEnabled = isFlapEnabled,
+            flapPosition = flapPosition,
+            flapDefaultTab = flapDefaultTab,
+            onDismiss = { showFlapSettings = false }
+        )
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = if (flapPosition == FlapPosition.LEFT) Alignment.CenterStart else Alignment.CenterEnd
     ) {
         // Flap container
         Box(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopEnd
+            contentAlignment = if (flapPosition == FlapPosition.LEFT) Alignment.TopStart else Alignment.TopEnd
         ) {
             Box(
                 modifier = Modifier
-                    .offset(y = currentYOffset)
+                    .offset(
+                        x = if (flapPosition == FlapPosition.LEFT) {
+                            with(density) { horizontalDragDelta.toDp() }.coerceAtLeast(0.dp)
+                        } else {
+                            with(density) { horizontalDragDelta.toDp() }.coerceAtMost(0.dp)
+                        },
+                        y = currentYOffset
+                    )
                     .width(flapWidth)
                     .height(flapHeight)
                     .then(
@@ -191,28 +250,57 @@ fun QuickAccessFlap(
                             )
                         }
                     )
-                    .clip(RoundedCornerShape(
-                        topStart = cornerRadius,
-                        bottomStart = cornerRadius,
-                        topEnd = 0.dp,
-                        bottomEnd = 0.dp
-                    ))
+                    .clip(
+                        if (flapPosition == FlapPosition.LEFT) {
+                            RoundedCornerShape(
+                                topStart = 0.dp,
+                                bottomStart = 0.dp,
+                                topEnd = cornerRadius,
+                                bottomEnd = cornerRadius
+                            )
+                        } else {
+                            RoundedCornerShape(
+                                topStart = cornerRadius,
+                                bottomStart = cornerRadius,
+                                topEnd = 0.dp,
+                                bottomEnd = 0.dp
+                            )
+                        }
+                    )
                     .background(MaterialTheme.colorScheme.surface)
                     .then(
                         if (!isExpanded) {
-                            // ✅ Draggable button when collapsed
-                            Modifier.pointerInput(Unit) {
+                            // ✅ Draggable button when collapsed - supports vertical drag and horizontal drag to switch sides
+                            Modifier.pointerInput(flapPosition) {
                                 detectDragGestures(
                                     onDragStart = { isDraggingButton = true },
-                                    onDragEnd = { isDraggingButton = false },
+                                    onDragEnd = {
+                                        isDraggingButton = false
+                                        // Check if dragged far enough to switch sides
+                                        if (kotlin.math.abs(horizontalDragDelta) > dragThreshold) {
+                                            scope.launch {
+                                                val newPosition = if (flapPosition == FlapPosition.LEFT) {
+                                                    FlapPosition.RIGHT
+                                                } else {
+                                                    FlapPosition.LEFT
+                                                }
+                                                flapPrefs.setFlapPosition(newPosition)
+                                                viewModel.showToast("Flap moved to ${newPosition.value} side")
+                                            }
+                                        }
+                                        horizontalDragDelta = 0f
+                                    },
                                     onDragCancel = {
                                         isDraggingButton = false
                                         dragButtonDeltaPx = 0f
+                                        horizontalDragDelta = 0f
                                     },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
-                                        // dragAmount.y is in pixels - store as-is
+                                        // Vertical drag for repositioning
                                         dragButtonDeltaPx += dragAmount.y
+                                        // Horizontal drag for switching sides
+                                        horizontalDragDelta += dragAmount.x
                                     }
                                 )
                             }
@@ -255,7 +343,8 @@ fun QuickAccessFlap(
                     )
                 } else {
                     CollapsedFlapButton(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onLongPress = { showFlapSettings = true }
                     )
                 }
             }
@@ -297,19 +386,23 @@ private fun Modifier.coloredShadow(
 }
 
 // ── Collapsed: small circular button on right edge ────────────────────────────
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CollapsedFlapButton(
-    viewModel: PaisaTrackerViewModel
+    viewModel: PaisaTrackerViewModel,
+    onLongPress: () -> Unit
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { viewModel.isFlapExpanded.value = true },
+                indication = null,
+                onClick = { viewModel.isFlapExpanded.value = true },
+                onLongClick = onLongPress
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(

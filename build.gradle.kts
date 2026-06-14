@@ -58,8 +58,8 @@ android {
         applicationId = "com.h4rsh41.paisatracker"
         minSdk = 28
         targetSdk = 36
-        versionCode = 4
-        versionName = "v4.0.0"
+        versionCode = 5
+        versionName = "v5.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -82,6 +82,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// Disable Google Services plugin for debug builds to avoid package name mismatch
+tasks.whenTaskAdded {
+    if (name == "processDebugGoogleServices") {
+        enabled = false
     }
 }
 

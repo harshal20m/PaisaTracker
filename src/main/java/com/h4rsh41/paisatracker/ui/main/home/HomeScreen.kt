@@ -267,6 +267,17 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                             onTransactionClick = { navController.navigate("expense_details/$it") }
                         )
 
+                        // Recent Transactions Section - Moved here right after calendar
+                        RecentTransactionsSlider(
+                            expenses = recentExpenses,
+                            onExpenseClick = { navController.navigate("expense_details/${it.id}") },
+                            onMoreClick = {
+                                recentExpanded = !recentExpanded
+                            },
+                            showMore = recentExpanded,
+                            onLoadMore = { viewModel.loadMoreRecentExpenses() }
+                        )
+
                         // Only show SMS cards if at least one project exists
                         if (activeProjects.isNotEmpty()) {
                             // SMS History Scan Card
@@ -316,17 +327,7 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                             onViewFullAnalytics = { navController.navigate("analytics") },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
-
-                        RecentTransactionsSlider(
-                            expenses = recentExpenses,
-                            onExpenseClick = { navController.navigate("expense_details/${it.id}") },
-                            onMoreClick = {
-                                recentExpanded = !recentExpanded
-                            },
-                            showMore = recentExpanded,
-                            onLoadMore = { viewModel.loadMoreRecentExpenses() }
-                        )
-}
+                    }
                 }
             }
         }
