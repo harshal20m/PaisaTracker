@@ -20,6 +20,7 @@
 ## 📋 Table of Contents
 
 - [Overview](#-overview)
+- [Screenshots](#-screenshots)
 - [Core Features](#-core-features)
 - [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
@@ -55,6 +56,24 @@
 - **Rich Analytics**: Visual insights with charts and trends
 - **Home Screen Widgets**: 4 customizable widgets for quick access
 - **Backup & Restore**: Full database + assets backup in ZIP format
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="screenshots/Homepage.jpeg" width="200" alt="Home Page">
+  <img src="screenshots/homepage2.jpeg" width="200" alt="Home Page 2">
+  <img src="screenshots/projectspage.jpeg" width="200" alt="Projects Page">
+  <img src="screenshots/categorypage.jpeg" width="200" alt="Category Page">
+</p>
+
+<p align="center">
+  <img src="screenshots/financepage.jpeg" width="200" alt="Finance Page">
+  <img src="screenshots/analyticspage.jpeg" width="200" alt="Analytics Page">
+  <img src="screenshots/analyticspage2.jpeg" width="200" alt="Analytics Page 2">
+  <img src="screenshots/summarysheet.jpeg" width="200" alt="Summary Sheet">
+</p>
 
 ---
 
