@@ -84,17 +84,13 @@ fun WeeklyDashboardCalendar(
         }
     }
     
-    // Auto-select first day with transactions when week changes
-    LaunchedEffect(weekOffset, expensesByDate) {
-        if (expensesByDate.isNotEmpty()) {
-            // Find the first date in the week that has transactions
-            val firstDateWithTransactions = weekDates.firstOrNull { date ->
-                val dateKey = "${date.get(Calendar.YEAR)}-${date.get(Calendar.MONTH)}-${date.get(Calendar.DAY_OF_MONTH)}"
-                expensesByDate.containsKey(dateKey)
-            }
-            if (firstDateWithTransactions != null) {
-                selectedDate = firstDateWithTransactions
-            }
+    // Smart date selection based on week context
+    LaunchedEffect(weekOffset) {
+        selectedDate = when {
+            // Current week: select today
+            weekOffset == 0 -> today.clone() as Calendar
+            // Past weeks: select Sunday (first day of week)
+            else -> weekDates.first()
         }
     }
 

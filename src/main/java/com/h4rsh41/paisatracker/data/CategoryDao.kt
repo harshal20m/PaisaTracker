@@ -97,4 +97,50 @@ interface CategoryDao {
      */
     @Query("SELECT * FROM projects WHERE isCompleted = 0 ORDER BY id ASC LIMIT 1")
     suspend fun getDefaultProject(): Project?
+
+    /**
+     * Get categories sorted by most recently used (based on latest expense date).
+     * Only includes categories from active (non-completed) projects.
+     * Categories with recent expenses appear first, followed by categories without expenses.
+     *
+     * @return Flow of categories sorted by usage
+     */
+    @Query("""
+        SELECT c.*, MAX(e.date) as latestExpenseDate
+        FROM categories c
+        INNER JOIN projects p ON c.projectId = p.id
+        LEFT JOIN expenses e ON c.id = e.categoryId
+        WHERE p.isCompleted = 0
+        GROUP BY c.id
+        ORDER BY latestExpenseDate DESC NULLS LAST, c.name ASC
+    """)
+    fun getCategoriesByRecentUsage(): Flow<List<Category>>
+
+    /**
+     * Search categories by name with project context.
+     * Returns categories matching the search query with their project information.
+     * Only includes categories from active (non-completed) projects.
+     *
+     * @param query Search query to match against category name
+     * @return Flow of category search results with project context
+     */
+    @Query("""
+        SELECT
+            c.id as categoryId,
+            c.name as categoryName,
+            c.emoji as categoryEmoji,
+            p.id as projectId,
+            p.name as projectName,
+            p.emoji as projectEmoji,
+            COUNT(CASE WHEN e.amount > 0 THEN e.id END) as expenseCount,
+            COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) as totalAmount
+        FROM categories c
+        INNER JOIN projects p ON c.projectId = p.id
+        LEFT JOIN expenses e ON c.id = e.categoryId
+        WHERE p.isCompleted = 0
+        AND c.name LIKE '%' || :query || '%'
+        GROUP BY c.id, c.name, c.emoji, p.id, p.name, p.emoji
+        ORDER BY c.name ASC
+    """)
+    fun searchCategories(query: String): Flow<List<CategorySearchResult>>
 }

@@ -11,9 +11,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.h4rsh41.paisatracker.data.PaisaTrackerRepository
 import com.h4rsh41.paisatracker.data.RecentExpense
+import com.h4rsh41.paisatracker.data.SearchResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.FlowPreview
 
 private val Context.recentSearchesDataStore: DataStore<Preferences> by preferencesDataStore(name = "recent_searches")
 
@@ -34,6 +36,9 @@ class SearchViewModel(
     private val _searchResults = MutableStateFlow<List<RecentExpense>>(emptyList())
     val searchResults: StateFlow<List<RecentExpense>> = _searchResults
 
+    private val _unifiedSearchResults = MutableStateFlow<List<SearchResult>>(emptyList())
+    val unifiedSearchResults: StateFlow<List<SearchResult>> = _unifiedSearchResults
+
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive
 
@@ -52,6 +57,24 @@ class SearchViewModel(
 
     init {
         loadRecentSearches()
+        setupAutoSearch()
+    }
+
+    @OptIn(FlowPreview::class)
+    private fun setupAutoSearch() {
+        _searchQuery
+            .debounce(500) // Wait 500ms after user stops typing
+            .distinctUntilChanged()
+            .onEach { query ->
+                if (query.isNotBlank()) {
+                    executeSearch()
+                } else {
+                    _searchResults.value = emptyList()
+                    _unifiedSearchResults.value = emptyList()
+                    _isSearchActive.value = false
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     fun setProjectId(id: Long?) {
@@ -81,6 +104,7 @@ class SearchViewModel(
 
             if (query.isBlank() && min == null && max == null) {
                 _searchResults.value = emptyList()
+                _unifiedSearchResults.value = emptyList()
                 return@launch
             }
 
@@ -89,13 +113,20 @@ class SearchViewModel(
                 saveRecentSearch(query)
             }
 
-            val resultsFlow = if (query.isNotBlank()) {
-                repository.searchExpensesByDescription(query, currentProjectId)
+            // Use unified search for text queries
+            if (query.isNotBlank()) {
+                val results = repository.unifiedSearch(query, currentProjectId)
+                _unifiedSearchResults.value = results
+                // Also populate old searchResults for backward compatibility
+                _searchResults.value = results.filterIsInstance<SearchResult.ExpenseResult>()
+                    .map { it.expense }
             } else {
-                repository.searchExpensesByAmount(min, max, currentProjectId)
+                // Amount-based search (expenses only)
+                val resultsFlow = repository.searchExpensesByAmount(min, max, currentProjectId)
+                val expenses = resultsFlow.first()
+                _searchResults.value = expenses
+                _unifiedSearchResults.value = expenses.map { SearchResult.ExpenseResult(it) }
             }
-
-            _searchResults.value = resultsFlow.first()
         }
     }
 
@@ -104,6 +135,7 @@ class SearchViewModel(
         _minAmount.value = ""
         _maxAmount.value = ""
         _searchResults.value = emptyList()
+        _unifiedSearchResults.value = emptyList()
         _isSearchActive.value = false
         _projectId.value = null
         searchJob?.cancel()

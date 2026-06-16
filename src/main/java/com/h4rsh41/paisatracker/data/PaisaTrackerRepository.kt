@@ -299,6 +299,9 @@ class PaisaTrackerRepository(
     suspend fun getAllCategoriesList(): List<Category> {
         return categoryDao.getAllCategoriesList()
     }
+    
+    fun getCategoriesByRecentUsage(): Flow<List<Category>> = categoryDao.getCategoriesByRecentUsage()
+    
     fun getAllExpenses(): Flow<List<Expense>> = expenseDao.getAllExpenses()
 
     suspend fun getExportRows(projectId: Long?): List<ExportRow> =
@@ -460,6 +463,41 @@ class PaisaTrackerRepository(
 
     fun searchExpensesByDateRange(startDate: Long?, endDate: Long?, projectId: Long?): Flow<List<RecentExpense>> {
         return expenseDao.searchExpensesByDateRange(startDate, endDate, projectId)
+    }
+
+    /**
+     * Unified smart search that searches both expenses and categories.
+     * Returns a combined list of search results with proper type distinction.
+     *
+     * @param query Search query string
+     * @param projectId Optional project filter
+     * @return Flow of unified search results (expenses and categories)
+     */
+    suspend fun unifiedSearch(query: String, projectId: Long?): List<SearchResult> {
+        if (query.isBlank()) return emptyList()
+        
+        val results = mutableListOf<SearchResult>()
+        
+        // Search expenses
+        val expenses = expenseDao.searchExpensesByDescription(query, projectId).firstOrNull() ?: emptyList()
+        results.addAll(expenses.map { SearchResult.ExpenseResult(it) })
+        
+        // Search categories
+        val categories = categoryDao.searchCategories(query).firstOrNull() ?: emptyList()
+        results.addAll(categories.map {
+            SearchResult.CategoryResult(
+                categoryId = it.categoryId,
+                categoryName = it.categoryName,
+                categoryEmoji = it.categoryEmoji,
+                projectId = it.projectId,
+                projectName = it.projectName,
+                projectEmoji = it.projectEmoji,
+                expenseCount = it.expenseCount,
+                totalAmount = it.totalAmount
+            )
+        })
+        
+        return results
     }
 
     // ============================================================================

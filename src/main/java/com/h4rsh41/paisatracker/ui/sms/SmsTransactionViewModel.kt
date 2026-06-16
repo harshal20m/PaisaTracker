@@ -98,8 +98,19 @@ class SmsTransactionViewModel(
     private fun loadCategoriesAndProjects() {
         viewModelScope.launch {
             try {
-                _categories.value = categoryDao.getAllCategoriesList()
-                _projects.value = projectDao.getAllProjectsList()
+                // Load categories sorted by recent usage, excluding completed projects
+                launch {
+                    categoryDao.getCategoriesByRecentUsage().collect { categoriesList ->
+                        _categories.value = categoriesList
+                    }
+                }
+                
+                // Load only active (non-completed) projects using Flow
+                launch {
+                    projectDao.getActiveProjects().collect { projectsList ->
+                        _projects.value = projectsList
+                    }
+                }
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to load categories and projects: ${e.message}"
             }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -143,6 +144,45 @@ fun SmsTransactionConfirmationSheet(
                 selected = selectedCategory != null,
                 onClick  = { showCategoryPicker = true }
             )
+            
+            // Recent categories grid
+            if (categories.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Recent",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Spacer(Modifier.height(6.dp))
+                
+                // Show top 6 recent categories in a grid
+                val recentCategories = categories.take(6)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    recentCategories.chunked(3).forEach { rowCategories ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            rowCategories.forEach { category ->
+                                CategoryPillChip(
+                                    emoji = category.emoji,
+                                    name = category.name,
+                                    isSelected = selectedCategory?.id == category.id,
+                                    onClick = { selectedCategory = category },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            // Fill remaining space if row is not complete
+                            repeat(3 - rowCategories.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(14.dp))
 
@@ -527,13 +567,33 @@ private fun <T> DarkPickerDialog(
             )
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text       = title,
-                    fontSize   = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.onSurface,
-                    modifier   = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                )
+                // Header with title and close button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text       = title,
+                        fontSize   = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = MaterialTheme.colorScheme.onSurface,
+                        modifier   = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
                 HorizontalDivider(
                     color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                     thickness = 0.5.dp
@@ -592,8 +652,28 @@ private fun <T> DarkPickerDialog(
                         navController = navController
                     )
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(items) { item -> itemContent(item) }
+                    // Grid layout for categories
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(items.chunked(2)) { rowItems ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowItems.forEach { item ->
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        itemContent(item)
+                                    }
+                                }
+                                // Fill remaining space if row is not complete
+                                if (rowItems.size == 1) {
+                                    Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -702,31 +782,92 @@ private fun PickerDialogRow(
     selected : Boolean,
     onClick  : () -> Unit
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .background(
-                if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                else androidx.compose.ui.graphics.Color.Transparent
-            )
-            .padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(emoji, fontSize = 24.sp)
-        Text(
-            text     = name,
-            fontSize = 14.sp,
-            color    = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (selected) 4.dp else 0.dp
         )
-        if (selected) {
-            Icon(
-                Icons.Default.Check,
-                contentDescription = null,
-                tint               = MaterialTheme.colorScheme.primary,
-                modifier           = Modifier.size(18.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = emoji,
+                fontSize = 32.sp
+            )
+            Text(
+                text = name,
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected)
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (selected) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+// Category Pill Chip for quick selection
+@Composable
+private fun CategoryPillChip(
+    emoji: String,
+    name: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = emoji,
+                fontSize = 14.sp
+            )
+            Text(
+                text = name,
+                fontSize = 11.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

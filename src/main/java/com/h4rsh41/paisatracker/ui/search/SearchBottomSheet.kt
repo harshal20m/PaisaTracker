@@ -21,9 +21,12 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.h4rsh41.paisatracker.data.RecentExpense
+import com.h4rsh41.paisatracker.data.SearchResult
 import com.h4rsh41.paisatracker.util.formatCurrency
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,12 +46,14 @@ fun SearchBottomSheet(
     searchViewModel: SearchViewModel,
     onDismiss: () -> Unit,
     onExpenseClick: (RecentExpense) -> Unit,
+    onCategoryClick: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val searchQuery by searchViewModel.searchQuery.collectAsStateWithLifecycle()
     val minAmount by searchViewModel.minAmount.collectAsStateWithLifecycle()
     val maxAmount by searchViewModel.maxAmount.collectAsStateWithLifecycle()
     val searchResults by searchViewModel.searchResults.collectAsStateWithLifecycle()
+    val unifiedSearchResults by searchViewModel.unifiedSearchResults.collectAsStateWithLifecycle()
     val isSearchActive by searchViewModel.isSearchActive.collectAsStateWithLifecycle()
     val recentSearches by searchViewModel.recentSearches.collectAsStateWithLifecycle()
     
@@ -80,7 +85,7 @@ fun SearchBottomSheet(
                     modifier = Modifier.size(28.dp)
                 )
                 Text(
-                    "Search Expenses",
+                    "Smart Search",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -94,7 +99,7 @@ fun SearchBottomSheet(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchViewModel.onSearchQueryChanged(it) },
-            placeholder = { Text("Search by description...") },
+            placeholder = { Text("Search expenses or categories...") },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null)
             },
@@ -239,13 +244,14 @@ fun SearchBottomSheet(
                 .fillMaxWidth()
         ) {
             when {
-                isSearchActive && searchResults.isNotEmpty() -> {
-                    SearchResultsList(
-                        results = searchResults,
-                        onExpenseClick = onExpenseClick
+                isSearchActive && unifiedSearchResults.isNotEmpty() -> {
+                    UnifiedSearchResultsList(
+                        results = unifiedSearchResults,
+                        onExpenseClick = onExpenseClick,
+                        onCategoryClick = onCategoryClick
                     )
                 }
-                isSearchActive && searchResults.isEmpty() -> {
+                isSearchActive && unifiedSearchResults.isEmpty() -> {
                     EmptySearchResults()
                 }
                 recentSearches.isNotEmpty() -> {
@@ -257,6 +263,58 @@ fun SearchBottomSheet(
                 }
                 else -> {
                     EmptySearchState()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnifiedSearchResultsList(
+    results: List<SearchResult>,
+    onExpenseClick: (RecentExpense) -> Unit,
+    onCategoryClick: ((Long) -> Unit)?
+) {
+    val expenseCount = results.count { it is SearchResult.ExpenseResult }
+    val categoryCount = results.count { it is SearchResult.CategoryResult }
+    
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            buildString {
+                if (expenseCount > 0 && categoryCount > 0) {
+                    append("Found $expenseCount expense${if (expenseCount != 1) "s" else ""} and $categoryCount categor${if (categoryCount != 1) "ies" else "y"}")
+                } else if (expenseCount > 0) {
+                    append("Found $expenseCount expense${if (expenseCount != 1) "s" else ""}")
+                } else {
+                    append("Found $categoryCount categor${if (categoryCount != 1) "ies" else "y"}")
+                }
+            },
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            items(results.size) { index ->
+                when (val result = results[index]) {
+                    is SearchResult.ExpenseResult -> {
+                        SearchResultCard(
+                            expense = result.expense,
+                            onClick = { onExpenseClick(result.expense) }
+                        )
+                    }
+                    is SearchResult.CategoryResult -> {
+                        CategoryResultCard(
+                            category = result,
+                            onClick = { onCategoryClick?.invoke(result.categoryId) }
+                        )
+                    }
                 }
             }
         }
@@ -285,6 +343,92 @@ private fun SearchResultsList(
         ) {
             items(results, key = { it.id }) { expense ->
                 SearchResultCard(expense = expense, onClick = { onExpenseClick(expense) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryResultCard(
+    category: SearchResult.CategoryResult,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        category.categoryEmoji.ifBlank { "📁" },
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        category.categoryName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${category.projectEmoji} ${category.projectName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (category.expenseCount > 0) {
+                            Text(
+                                " • ${category.expenseCount} expense${if (category.expenseCount != 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (category.totalAmount > 0) {
+                Text(
+                    text = formatCurrency(category.totalAmount),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                )
             }
         }
     }
@@ -338,11 +482,38 @@ private fun SearchResultCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        "${expense.categoryName} • ${SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${expense.projectEmoji} ${expense.projectName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            expense.categoryName,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(expense.date)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 
@@ -480,12 +651,11 @@ private fun EmptySearchState() {
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                "Enter a description to find expenses",
+                "Search for expenses or categories",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }
 }
-
-// Made with Bob

@@ -16,9 +16,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,7 +47,6 @@ fun ThemeSelectionBottomSheet(
     val showDynamic   = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val scope         = rememberCoroutineScope()
     val sheetState    = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val lazyRowState  = rememberLazyListState()
 
     val availableThemes = remember(showDynamic) {
         AppTheme.values().filter { it != AppTheme.WALLPAPER_ORIENTED || showDynamic }
@@ -143,11 +142,16 @@ fun ThemeSelectionBottomSheet(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Horizontal scrolling swatch row ───────────────────────────────
-            LazyRow(
-                state               = lazyRowState,
-                contentPadding      = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // ── Grid layout for theme swatches ────────────────────────────────
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(320.dp)
+                    .padding(horizontal = 24.dp),
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(availableThemes, key = { it.name }) { theme ->
                     ThemeSwatch(

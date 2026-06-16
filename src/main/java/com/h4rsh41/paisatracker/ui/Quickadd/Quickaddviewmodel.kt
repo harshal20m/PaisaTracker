@@ -60,12 +60,24 @@ class QuickAddViewModel(
     val activeBankAccounts: StateFlow<List<BankAccount>> = repository.getActiveBankAccounts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Categories filtered to selected project
+    // Get categories sorted by recent usage (from DB query)
+    private val categoriesByRecentUsage: StateFlow<List<Category>> =
+        repository.getCategoriesByRecentUsage()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Categories filtered to selected project (excluding completed projects)
+    // Sorted by recent usage - recently used categories appear first
     val filteredCategories: StateFlow<List<Category>> = combine(
-        allCategories, selectedProject
-    ) { cats, proj ->
+        categoriesByRecentUsage, selectedProject, allProjects
+    ) { cats, proj, projects ->
         if (proj == null) emptyList()
-        else cats.filter { it.projectId == proj.id }
+        else {
+            // Only show categories from active (non-completed) projects
+            val activeProjectIds = projects.filter { !it.isCompleted }.map { it.id }.toSet()
+            // Filter by selected project and active status
+            // Categories are already sorted by recent usage from the DB query
+            cats.filter { it.projectId == proj.id && activeProjectIds.contains(it.projectId) }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── Recent projects/categories (last 5 unique, derived from allCategories ordering) ──
@@ -75,8 +87,9 @@ class QuickAddViewModel(
     val recentProjects: StateFlow<List<Project>> = repository.getAllProjects()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Recent categories = last 5 categories across all projects (by id desc = newest created)
-    val recentCategories: StateFlow<List<Category>> = repository.getAllCategories()
+    // Recent categories = top 10 most recently used categories from active projects
+    // Already sorted by usage from the DB query
+    val recentCategories: StateFlow<List<Category>> = categoriesByRecentUsage
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ── Auto-select logic: when project selected, auto-pick its first category ──
