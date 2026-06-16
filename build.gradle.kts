@@ -71,6 +71,13 @@ android {
         }
         val analyticsEnabled = localProperties.getProperty("analytics.enabled", "false")
         buildConfigField("boolean", "ANALYTICS_ENABLED", analyticsEnabled)
+        
+        // Room schema export configuration
+        ksp {
+            arg("room.schemaLocation", "$projectDir/schemas")
+            arg("room.incremental", "true")
+            arg("room.expandProjection", "true")
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

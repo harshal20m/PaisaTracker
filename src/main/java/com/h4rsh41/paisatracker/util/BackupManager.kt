@@ -29,7 +29,7 @@ class BackupManager(private val context: Context) {
     suspend fun createFullBackup(destinationUri: Uri): BackupMetadata? = withContext(Dispatchers.IO) {
         try {
             // Get database file - MUST match your actual database name
-            val dbPath = context.getDatabasePath("paisa_tracker_database_v2").absolutePath
+            val dbPath = context.getDatabasePath("paisa_tracker_database").absolutePath
             val dbFile = File(dbPath)
 
             if (!dbFile.exists()) {
@@ -97,10 +97,10 @@ class BackupManager(private val context: Context) {
                             }
                         }
                     }
-                    
+
                     // Add schema version metadata
                     zipOut.putNextEntry(ZipEntry("schema_version.txt"))
-                    zipOut.write("1".toByteArray()) // Current schema version
+                    zipOut.write("14".toByteArray()) // Current schema version
                     zipOut.closeEntry()
                 }
             }
@@ -142,11 +142,11 @@ class BackupManager(private val context: Context) {
     suspend fun restoreFromBackup(sourceUri: Uri): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.i(TAG, "Starting restore from backup...")
-            
+
             // Close current database
             database.close()
 
-            val dbPath = context.getDatabasePath("paisa_tracker_database_v2").absolutePath
+            val dbPath = context.getDatabasePath("paisa_tracker_database").absolutePath
             val dbFile = File(dbPath)
             val tempDbFile = File(dbPath + ".temp")
             val assetDir = File(context.filesDir, "expense_assets")
@@ -214,32 +214,59 @@ class BackupManager(private val context: Context) {
                 return@withContext false
             }
 
-            // Open database - no migrations needed since we're at version 1
+            // Open database with migrations to upgrade old backups
+            // Try with migrations first, fallback to manual extraction if migration fails
             try {
                 val restoredDb = Room.databaseBuilder(
                     context.applicationContext,
                     PaisaTrackerDatabase::class.java,
-                    "paisa_tracker_database_v2"
+                    "paisa_tracker_database"
                 )
-                    .fallbackToDestructiveMigration() // Allow destructive migration for fresh start
+                    .addMigrations(
+                        PaisaTrackerDatabase.MIGRATION_1_2,
+                        PaisaTrackerDatabase.MIGRATION_2_3,
+                        PaisaTrackerDatabase.MIGRATION_3_4,
+                        PaisaTrackerDatabase.MIGRATION_4_5,
+                        PaisaTrackerDatabase.MIGRATION_5_6,
+                        PaisaTrackerDatabase.MIGRATION_6_7,
+                        PaisaTrackerDatabase.MIGRATION_7_8,
+                        PaisaTrackerDatabase.MIGRATION_8_9,
+                        PaisaTrackerDatabase.MIGRATION_9_10,
+                        PaisaTrackerDatabase.MIGRATION_10_11,
+                        PaisaTrackerDatabase.MIGRATION_11_12,
+                        PaisaTrackerDatabase.MIGRATION_12_13,
+                        PaisaTrackerDatabase.MIGRATION_13_14
+                    )
                     .build()
 
                 // Force database to open and run migrations
                 restoredDb.openHelper.writableDatabase
-                
+
                 // Verify database is accessible
                 val expenseCount = restoredDb.expenseDao().getExpenseCount()
                 Log.i(TAG, "Database restored successfully with $expenseCount expenses")
-                
+
                 restoredDb.close()
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to open restored database", e)
-                return@withContext false
+            } catch (migrationError: Exception) {
+                Log.e(TAG, "Migration failed, attempting data extraction from old backup", migrationError)
+
+                // If migration fails, try to extract data manually from old schema
+                try {
+                    val success = extractDataFromOldBackup(dbFile)
+                    if (!success) {
+                        Log.e(TAG, "Failed to extract data from old backup")
+                        return@withContext false
+                    }
+                    Log.i(TAG, "Successfully extracted data from old backup format")
+                } catch (extractError: Exception) {
+                    Log.e(TAG, "Failed to extract data from old backup", extractError)
+                    return@withContext false
+                }
             }
 
             // Reopen database with normal instance
             PaisaTrackerDatabase.getDatabase(context)
-            
+
             Log.i(TAG, "Restore completed successfully")
             true
 
@@ -253,6 +280,199 @@ class BackupManager(private val context: Context) {
             }
             false
         }
+    }
+
+    /**
+     * Extract data from old backup format when migration fails.
+     * This handles backups from unknown/very old schema versions by reading
+     * the raw SQLite tables directly and re-inserting rows through the DAOs
+     * of a fresh, current-schema database.
+     */
+    private suspend fun extractDataFromOldBackup(oldDbFile: File): Boolean = withContext(Dispatchers.IO) {
+        try {
+            Log.i(TAG, "Attempting to extract data from old backup format...")
+
+            // Create a new database with current schema
+            val newDb = PaisaTrackerDatabase.getDatabase(context)
+
+            // Open old database directly with SQLite
+            val oldDb = android.database.sqlite.SQLiteDatabase.openDatabase(
+                oldDbFile.absolutePath,
+                null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+            )
+
+            try {
+                // Extract Projects (core table, should exist in all versions)
+                val projectsCursor = oldDb.rawQuery(
+                    "SELECT id, name, emoji, createdAt, lastModified, isCompleted FROM projects",
+                    null
+                )
+
+                val projectIdMap = mutableMapOf<Long, Long>() // old ID -> new ID
+
+                projectsCursor.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val oldId = cursor.getLong(0)
+                        val name = cursor.getString(1)
+                        val emoji = cursor.getStringOrNull(2) ?: "📁"
+                        val createdAt = cursor.getLong(3)
+                        val lastModified = cursor.getLong(4)
+                        val isCompleted = cursor.getInt(5) == 1
+
+                        val project = com.h4rsh41.paisatracker.data.Project(
+                            id = 0, // Auto-generate new ID
+                            name = name,
+                            emoji = emoji,
+                            createdAt = createdAt,
+                            lastModified = lastModified,
+                            isCompleted = isCompleted,
+                            includeInSalary = true // Default for old backups
+                        )
+
+                        val newId = newDb.projectDao().insertProject(project)
+                        projectIdMap[oldId] = newId
+                        Log.d(TAG, "Extracted project: $name (old ID: $oldId -> new ID: $newId)")
+                    }
+                }
+
+                // Extract Categories
+                val categoriesCursor = oldDb.rawQuery(
+                    "SELECT id, name, projectId, createdAt FROM categories",
+                    null
+                )
+
+                val categoryIdMap = mutableMapOf<Long, Long>()
+
+                categoriesCursor.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val oldId = cursor.getLong(0)
+                        val name = cursor.getString(1)
+                        val oldProjectId = cursor.getLong(2)
+                        val createdAt = cursor.getLong(3)
+
+                        val newProjectId = projectIdMap[oldProjectId] ?: continue
+
+                        val category = com.h4rsh41.paisatracker.data.Category(
+                            id = 0,
+                            name = name,
+                            projectId = newProjectId,
+                            emoji = "▶️", // Default for old backups
+                            createdAt = createdAt
+                        )
+
+                        val newId = newDb.categoryDao().insertCategory(category)
+                        categoryIdMap[oldId] = newId
+                        Log.d(TAG, "Extracted category: $name")
+                    }
+                }
+
+                // Extract Expenses
+                val expensesCursor = oldDb.rawQuery(
+                    "SELECT id, amount, date, description, categoryId, assetPath FROM expenses",
+                    null
+                )
+
+                var expenseCount = 0
+                expensesCursor.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val amount = cursor.getDouble(1)
+                        val date = cursor.getLong(2)
+                        val description = cursor.getString(3)
+                        val oldCategoryId = cursor.getLong(4)
+                        val assetPath = cursor.getStringOrNull(5)
+
+                        val newCategoryId = categoryIdMap[oldCategoryId] ?: continue
+
+                        val expense = com.h4rsh41.paisatracker.data.Expense(
+                            id = 0,
+                            amount = amount,
+                            date = date,
+                            description = description,
+                            categoryId = newCategoryId,
+                            assetPath = assetPath,
+                            paymentMethod = null, // New field, set to null
+                            paymentIcon = null,
+                            bankAccountId = null
+                        )
+
+                        newDb.expenseDao().insertExpense(expense)
+                        expenseCount++
+                    }
+                }
+
+                Log.i(TAG, "Successfully extracted $expenseCount expenses from old backup")
+
+                // Try to extract budgets if table exists
+                try {
+                    val budgetsCursor = oldDb.rawQuery(
+                        "SELECT name, emoji, limitAmount, period, categoryId, projectId, createdAt, trackingStartAt, isActive FROM budgets",
+                        null
+                    )
+
+                    budgetsCursor.use { cursor ->
+                        while (cursor.moveToNext()) {
+                            val name = cursor.getString(0)
+                            val emoji = cursor.getStringOrNull(1) ?: "💰"
+                            val limitAmount = cursor.getDouble(2)
+                            val period = cursor.getString(3)
+                            val oldCategoryId = cursor.getLongOrNull(4)
+                            val oldProjectId = cursor.getLongOrNull(5)
+                            val createdAt = cursor.getLong(6)
+                            val trackingStartAt = cursor.getLong(7)
+                            val isActive = cursor.getInt(8) == 1
+
+                            val newCategoryId = oldCategoryId?.let { categoryIdMap[it] }
+                            val newProjectId = oldProjectId?.let { projectIdMap[it] }
+
+                            val budget = com.h4rsh41.paisatracker.data.Budget(
+                                id = 0,
+                                name = name,
+                                emoji = emoji,
+                                limitAmount = limitAmount,
+                                period = com.h4rsh41.paisatracker.data.BudgetPeriod.valueOf(period),
+                                categoryId = newCategoryId,
+                                projectId = newProjectId,
+                                createdAt = createdAt,
+                                trackingStartAt = trackingStartAt,
+                                isActive = isActive
+                            )
+
+                            newDb.budgetDao().insertBudget(budget)
+                        }
+                    }
+                    Log.i(TAG, "Extracted budgets from old backup")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not extract budgets (table may not exist in old backup)", e)
+                }
+
+                oldDb.close()
+                return@withContext true
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during data extraction", e)
+                oldDb.close()
+                return@withContext false
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open old database for extraction", e)
+            return@withContext false
+        }
+    }
+
+    /**
+     * Helper extension to get nullable string from cursor
+     */
+    private fun android.database.Cursor.getStringOrNull(columnIndex: Int): String? {
+        return if (isNull(columnIndex)) null else getString(columnIndex)
+    }
+
+    /**
+     * Helper extension to get nullable long from cursor
+     */
+    private fun android.database.Cursor.getLongOrNull(columnIndex: Int): Long? {
+        return if (isNull(columnIndex)) null else getLong(columnIndex)
     }
 
     /**

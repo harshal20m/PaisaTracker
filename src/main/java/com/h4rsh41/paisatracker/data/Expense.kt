@@ -9,21 +9,22 @@ import androidx.room.PrimaryKey
     tableName = "expenses",
     foreignKeys = [
         ForeignKey(
-            entity = Category::class,
-            parentColumns = ["id"],
-            childColumns = ["categoryId"],
-            onDelete = ForeignKey.CASCADE
-        ),
-        ForeignKey(
             entity = BankAccount::class,
             parentColumns = ["id"],
             childColumns = ["bankAccountId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = Category::class,
+            parentColumns = ["id"],
+            childColumns = ["categoryId"],
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [
+        Index(value = ["bankAccountId"]),
         Index(value = ["categoryId"]),
-        Index(value = ["bankAccountId"])
+        Index(value = ["date"])
     ]
 )
 data class Expense(

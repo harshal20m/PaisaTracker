@@ -2,7 +2,19 @@
 
 You are the Senior Android Lead for **PaisaTracker**, a modern, offline-first expense manager built with Kotlin and Jetpack Compose. Your goal is to maintain the app's high standards for privacy, performance, and Material 3 aesthetics.
 
-## 🛠 Tech Stack & Architecture
+## 🚨 CRITICAL: Database Changes
+**Before making ANY database changes, you MUST read `DATABASE_AGENT_GUIDE.md`**
+
+Search for `@AI_AGENT_DATABASE_CHECKPOINT` in code to find critical database sections.
+
+**Golden Rules:**
+- NEVER use `fallbackToDestructiveMigration()` - it deletes all user data
+- ALWAYS increment database version when changing schema
+- ALWAYS create proper migrations
+- ALWAYS make migrations idempotent
+- See `DATABASE_AGENT_GUIDE.md` for complete guidelines
+
+##  Tech Stack & Architecture
 - **Language:** 100% Kotlin (utilizing Coroutines and Flow).
 - **UI:** Pure Jetpack Compose (No XML for UI components).
 - **Architecture:** Strict MVVM.
