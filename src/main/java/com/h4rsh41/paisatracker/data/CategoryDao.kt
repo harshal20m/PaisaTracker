@@ -48,7 +48,7 @@ interface CategoryDao {
     @Query("""
     SELECT
         c.*,
-        COALESCE(SUM(e.amount), 0.0) AS totalAmount,
+        COALESCE(SUM(CASE WHEN e.amount > 0 THEN e.amount ELSE 0 END), 0.0) AS totalAmount,
         COUNT(CASE WHEN e.amount > 0 THEN e.id END) AS expenseCount,
         COUNT(CASE WHEN e.amount < 0 THEN e.id END) AS creditCount,
         MAX(e.date) AS latestExpenseTime

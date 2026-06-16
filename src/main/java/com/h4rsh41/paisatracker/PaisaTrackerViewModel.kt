@@ -202,13 +202,26 @@ class PaisaTrackerViewModel(
 
     val updateAvailable: StateFlow<GithubRelease?> = updateManager?.updateAvailable
         ?: MutableStateFlow(null)
+    
+    val showStarRepoCard: StateFlow<Boolean> = updateManager?.showStarRepoCard
+        ?: MutableStateFlow(false)
+    
     fun checkForUpdates(isManual: Boolean = false) {
         viewModelScope.launch {
             updateManager?.checkForUpdates(isManual)
         }
     }
+    
     fun dismissUpdate() {
         updateManager?.dismissUpdate()
+    }
+    
+    suspend fun markStarRepoCardShown() {
+        updateManager?.markStarRepoCardShown()
+    }
+    
+    fun dismissStarRepoCard() {
+        updateManager?.dismissStarRepoCard()
     }
     private val _toastMessage = MutableStateFlow<ToastMessage?>(null)
     val toastMessage = _toastMessage.asStateFlow()

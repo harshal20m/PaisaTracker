@@ -52,7 +52,7 @@ fun ProjectInsightsScreen(
         .collectAsState(initial = emptyList())
 
     var currentChartType by remember { mutableStateOf(ChartType.PIE) }
-    val totalSpent = categoryExpenses.sumOf { kotlin.math.abs(it.totalAmount) }
+    val totalSpent = categoryExpenses.sumOf { it.totalAmount }
 
     Scaffold(
         topBar = {

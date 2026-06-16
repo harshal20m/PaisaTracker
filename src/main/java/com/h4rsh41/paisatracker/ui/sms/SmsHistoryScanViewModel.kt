@@ -39,7 +39,8 @@ class SmsHistoryScanViewModel(application: Application) : AndroidViewModel(appli
         salaryRecordDao = database.salaryRecordDao(),
         actionHistoryDao = database.actionHistoryDao(),
         bankAccountDao = database.bankAccountDao(),
-        bankNotificationDao = database.bankNotificationDao()
+        bankNotificationDao = database.bankNotificationDao(),
+        accountTransactionDao = database.accountTransactionDao()
     )
     
     // Initialize scanner

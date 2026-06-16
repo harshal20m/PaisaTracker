@@ -39,9 +39,9 @@ import com.h4rsh41.paisatracker.data.BankAccount
 import com.h4rsh41.paisatracker.data.Budget
 import com.h4rsh41.paisatracker.ui.bankaccount.BankAccountViewModel
 import com.h4rsh41.paisatracker.ui.bankaccount.BankAccountViewModelFactory
-import com.h4rsh41.paisatracker.ui.bankaccount.AddBankAccountSheet
+import com.h4rsh41.paisatracker.ui.bankaccount.ImprovedAddBankAccountSheet
 import com.h4rsh41.paisatracker.ui.bankaccount.EditBankAccountSheet
-import com.h4rsh41.paisatracker.ui.bankaccount.AccountTransactionsSheet
+import com.h4rsh41.paisatracker.ui.bankaccount.ImprovedAccountTransactionsSheet
 import com.h4rsh41.paisatracker.ui.bankaccount.AddMoneySheet
 import com.h4rsh41.paisatracker.ui.bankaccount.AddSalaryToAccountSheet
 import com.h4rsh41.paisatracker.ui.bankaccount.AddSalarySheet
@@ -289,19 +289,20 @@ private fun AccountsTab(
         )
     }
 
-    // Add Account Sheet
+    // Add Account Sheet - Using Improved Version
     if (showAddAccountSheet) {
-        AddBankAccountSheet(
+        ImprovedAddBankAccountSheet(
             onDismiss = { showAddAccountSheet = false },
-            onConfirm = { name, type, bankName, balance, emoji, color ->
+            onConfirm = { name, type, bankName, balance, emoji, color, priority, accountLast4 ->
                 viewModel.createAccount(
                     name = name,
                     accountType = type,
                     bankName = bankName,
-                    accountNumberLast4 = null,
+                    accountNumberLast4 = accountLast4,
                     initialBalance = balance,
                     emoji = emoji,
                     colorHex = color,
+                    priority = priority,
                     onSuccess = { showAddAccountSheet = false }
                 )
             }
@@ -429,17 +430,12 @@ private fun AccountsTab(
         )
     }
 
-    // Transaction History Sheet
+    // Transaction History Sheet - Using Improved Version
     accountToShowTransactions?.let { account ->
-        AccountTransactionsSheet(
+        ImprovedAccountTransactionsSheet(
             account = account,
             viewModel = viewModel,
             onDismiss = { accountToShowTransactions = null },
-            onTransactionClick = { expense ->
-                // Navigate to expense detail
-                accountToShowTransactions = null
-                // TODO: Add navigation to expense detail if needed
-            },
             currencySymbol = currencySymbol
         )
     }

@@ -125,7 +125,7 @@ fun CategoryListItem(
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val shareOfTotal = if (totalAmountAllCategories > 0) (kotlin.math.abs(categoryWithTotal.totalAmount) / kotlin.math.abs(totalAmountAllCategories)).toFloat() else 0f
+    val shareOfTotal = if (totalAmountAllCategories > 0) (categoryWithTotal.totalAmount / totalAmountAllCategories).toFloat() else 0f
     val progress by animateFloatAsState(targetValue = shareOfTotal, animationSpec = spring(dampingRatio = 0.7f), label = "progress")
 
     Card(
@@ -158,7 +158,7 @@ fun CategoryListItem(
                     }
                 }
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(formatCurrency(kotlin.math.abs(categoryWithTotal.totalAmount)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(formatCurrency(categoryWithTotal.totalAmount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)) {
                         Text("${(shareOfTotal * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                     }
@@ -190,7 +190,7 @@ fun CategoryGridItem(
     modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val shareOfTotal = if (totalAmountAllCategories > 0) (kotlin.math.abs(categoryWithTotal.totalAmount) / kotlin.math.abs(totalAmountAllCategories)).toFloat() else 0f
+    val shareOfTotal = if (totalAmountAllCategories > 0) (categoryWithTotal.totalAmount / totalAmountAllCategories).toFloat() else 0f
 
     Card(
         modifier = modifier.fillMaxWidth().height(160.dp).clickable(onClick = onCategoryClick),
@@ -222,7 +222,7 @@ fun CategoryGridItem(
                     Text(categoryWithTotal.category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(formatCurrency(kotlin.math.abs(categoryWithTotal.totalAmount)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(formatCurrency(categoryWithTotal.totalAmount), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         val transactionText = buildString {
                             if (categoryWithTotal.expenseCount > 0) append("${categoryWithTotal.expenseCount} exp")

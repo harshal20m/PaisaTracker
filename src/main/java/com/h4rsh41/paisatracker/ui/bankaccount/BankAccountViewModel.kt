@@ -101,6 +101,7 @@ class BankAccountViewModel(
         initialBalance: Double,
         emoji: String,
         colorHex: String,
+        priority: String = "SECONDARY",
         onSuccess: (Long) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -114,6 +115,7 @@ class BankAccountViewModel(
                     currentBalance = initialBalance,
                     emoji = emoji,
                     colorHex = colorHex,
+                    priority = priority,
                     isActive = true,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
@@ -235,6 +237,52 @@ class BankAccountViewModel(
         } catch (e: Exception) {
             globalViewModel.showToast("Failed to load account: ${e.message}", ToastType.ERROR)
             null
+        }
+    }
+
+    /** Get transactions for last two months (for lazy loading) */
+    suspend fun getTransactionsForLastTwoMonths(
+        accountId: Long,
+        currentMonth: Int,
+        currentYear: Int,
+        lastMonth: Int,
+        lastYear: Int,
+        limit: Int = 100
+    ): List<com.h4rsh41.paisatracker.data.AccountTransaction> {
+        return try {
+            repository.getTransactionsForLastTwoMonths(
+                accountId, currentMonth, currentYear, lastMonth, lastYear, limit
+            )
+        } catch (e: Exception) {
+            globalViewModel.showToast("Failed to load transactions: ${e.message}", ToastType.ERROR)
+            emptyList()
+        }
+    }
+
+    /** Record a transaction (credit or debit) */
+    fun recordTransaction(
+        accountId: Long,
+        type: String,
+        amount: Double,
+        description: String = "",
+        referenceId: Long? = null,
+        referenceType: String? = null,
+        onSuccess: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.recordAccountTransaction(
+                    accountId = accountId,
+                    type = type,
+                    amount = amount,
+                    description = description,
+                    referenceId = referenceId,
+                    referenceType = referenceType
+                )
+                onSuccess()
+            } catch (e: Exception) {
+                globalViewModel.showToast("Failed to record transaction: ${e.message}", ToastType.ERROR)
+            }
         }
     }
 }

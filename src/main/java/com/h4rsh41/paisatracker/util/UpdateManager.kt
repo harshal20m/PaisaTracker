@@ -12,9 +12,11 @@ import androidx.annotation.Keep
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.google.gson.annotations.SerializedName
+import com.h4rsh41.paisatracker.data.AppVersionPreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -46,7 +48,11 @@ class UpdateManager(private val context: Context) {
     private val _updateAvailable = MutableStateFlow<GithubRelease?>(null)
     val updateAvailable: StateFlow<GithubRelease?> = _updateAvailable
 
+    private val _showStarRepoCard = MutableStateFlow(false)
+    val showStarRepoCard: StateFlow<Boolean> = _showStarRepoCard
+
     private val isChecking = AtomicBoolean(false)
+    private val versionPrefs = AppVersionPreferencesRepository.getInstance(context)
 
     suspend fun checkForUpdates(isManual: Boolean = false) {
         if (isChecking.getAndSet(true)) return
@@ -77,6 +83,8 @@ class UpdateManager(private val context: Context) {
                 if (isManual) {
                     _updateAvailable.value = null
                 }
+                // Check if user just updated to current version
+                checkForVersionUpdate()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Update check failed: ${e.message}")
@@ -84,6 +92,48 @@ class UpdateManager(private val context: Context) {
         } finally {
             isChecking.set(false)
         }
+    }
+
+    /**
+     * Check if the app version has changed and show star repo card if needed
+     */
+    suspend fun checkForVersionUpdate() {
+        val currentVersion = getAppVersionName()
+        val lastKnownVersion = versionPrefs.lastKnownVersion.first()
+        
+        Log.d(TAG, "Version check - Current: $currentVersion, Last Known: $lastKnownVersion")
+        
+        if (lastKnownVersion == null) {
+            // First time launch, just save the version
+            versionPrefs.updateLastKnownVersion(currentVersion)
+            Log.d(TAG, "First launch, saved version: $currentVersion")
+        } else if (lastKnownVersion != currentVersion) {
+            // Version changed - user updated the app
+            Log.d(TAG, "Version changed! Showing star repo card")
+            versionPrefs.updateLastKnownVersion(currentVersion)
+            versionPrefs.resetForNewVersion()
+            
+            // Show star repo card if not shown yet
+            val starCardShown = versionPrefs.starRepoCardShown.first()
+            if (!starCardShown) {
+                _showStarRepoCard.value = true
+            }
+        }
+    }
+
+    /**
+     * Mark star repository card as shown
+     */
+    suspend fun markStarRepoCardShown() {
+        versionPrefs.markStarRepoCardShown()
+        _showStarRepoCard.value = false
+    }
+
+    /**
+     * Dismiss star repository card
+     */
+    fun dismissStarRepoCard() {
+        _showStarRepoCard.value = false
     }
 
     fun dismissUpdate() {

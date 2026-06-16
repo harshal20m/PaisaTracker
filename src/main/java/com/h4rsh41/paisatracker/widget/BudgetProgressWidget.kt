@@ -45,7 +45,8 @@ class BudgetProgressWidget : GlanceAppWidget() {
             salaryRecordDao = db.salaryRecordDao(),
             actionHistoryDao = db.actionHistoryDao(),
             bankAccountDao  = db.bankAccountDao(),
-            bankNotificationDao = db.bankNotificationDao()
+            bankNotificationDao = db.bankNotificationDao(),
+            accountTransactionDao = db.accountTransactionDao()
         )
 
         val data = try {

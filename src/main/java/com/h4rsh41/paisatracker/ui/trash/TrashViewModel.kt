@@ -34,7 +34,8 @@ class TrashViewModel(application: Application) : AndroidViewModel(application) {
         salaryRecordDao = database.salaryRecordDao(),
         actionHistoryDao = database.actionHistoryDao(),
         bankAccountDao = database.bankAccountDao(),
-        bankNotificationDao = database.bankNotificationDao()
+        bankNotificationDao = database.bankNotificationDao(),
+        accountTransactionDao = database.accountTransactionDao()
     )
     
     private val smsTransactionProcessor = SmsTransactionProcessor(

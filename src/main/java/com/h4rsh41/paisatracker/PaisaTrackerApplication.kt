@@ -14,6 +14,7 @@ import com.h4rsh41.paisatracker.data.PaisaTrackerRepository
 import com.h4rsh41.paisatracker.data.ThemePreferencesRepository
 import com.h4rsh41.paisatracker.util.CurrentCurrency
 import com.h4rsh41.paisatracker.util.ExpenseReminderWorker
+import com.h4rsh41.paisatracker.util.UpdateManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -40,7 +41,8 @@ class PaisaTrackerApplication : Application() {
             database.salaryRecordDao(),
             database.actionHistoryDao(),
             database.bankAccountDao(),
-            database.bankNotificationDao()
+            database.bankNotificationDao(),
+            database.accountTransactionDao()
         )
     }
 
@@ -50,6 +52,10 @@ class PaisaTrackerApplication : Application() {
 
     val currencyPreferencesRepository: CurrencyPreferencesRepository by lazy {
         CurrencyPreferencesRepository(applicationContext)
+    }
+
+    val updateManager: UpdateManager by lazy {
+        UpdateManager(applicationContext)
     }
 
     override fun onCreate() {
@@ -72,6 +78,20 @@ class PaisaTrackerApplication : Application() {
         
         // Update user properties for analytics
         updateAnalyticsUserProperties()
+        
+        // Check for version updates (shows star repo card if updated)
+        checkForVersionUpdate()
+    }
+    
+    private fun checkForVersionUpdate() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                updateManager.checkForVersionUpdate()
+            } catch (e: Exception) {
+                // Silently fail - not critical for app functionality
+                e.printStackTrace()
+            }
+        }
     }
     
     private fun updateAnalyticsUserProperties() {

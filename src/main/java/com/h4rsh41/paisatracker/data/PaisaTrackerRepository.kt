@@ -14,7 +14,8 @@ class PaisaTrackerRepository(
     private val salaryRecordDao: SalaryRecordDao,
     private val actionHistoryDao: ActionHistoryDao,
     private val bankAccountDao: BankAccountDao,
-    private val bankNotificationDao: BankNotificationDao
+    private val bankNotificationDao: BankNotificationDao,
+    private val accountTransactionDao: AccountTransactionDao
 ) {
     // ── Bank Account Methods ──────────────────────────────────────────────────
     
@@ -75,6 +76,83 @@ class PaisaTrackerRepository(
     suspend fun deleteBankAccountById(accountId: Long) =
         bankAccountDao.deleteById(accountId)
     
+    
+    // ── Account Transaction Methods ───────────────────────────────────────────
+    
+    /** Get all transactions for an account */
+    fun getAccountTransactions(accountId: Long): Flow<List<AccountTransaction>> =
+        accountTransactionDao.getAccountTransactions(accountId)
+    
+    /** Get transactions for last two months (lazy loading) */
+    suspend fun getTransactionsForLastTwoMonths(
+        accountId: Long,
+        currentMonth: Int,
+        currentYear: Int,
+        lastMonth: Int,
+        lastYear: Int,
+        limit: Int = 100
+    ): List<AccountTransaction> =
+        accountTransactionDao.getTransactionsForLastTwoMonths(
+            accountId, currentMonth, currentYear, lastMonth, lastYear, limit
+        )
+    
+    /** Get credit transactions (salary, topup, refund) */
+    fun getCreditTransactions(accountId: Long): Flow<List<AccountTransaction>> =
+        accountTransactionDao.getCreditTransactions(accountId)
+    
+    /** Get debit transactions (expenses) */
+    fun getDebitTransactions(accountId: Long): Flow<List<AccountTransaction>> =
+        accountTransactionDao.getDebitTransactions(accountId)
+    
+    /** Get salary history for an account */
+    fun getSalaryHistory(accountId: Long): Flow<List<AccountTransaction>> =
+        accountTransactionDao.getSalaryHistory(accountId)
+    
+    /** Record a new transaction */
+    suspend fun recordAccountTransaction(
+        accountId: Long,
+        type: String,
+        amount: Double,
+        description: String = "",
+        referenceId: Long? = null,
+        referenceType: String? = null
+    ) {
+        // Get current account balance
+        val account = getBankAccountByIdOnce(accountId) ?: return
+        
+        // Calculate new balance based on transaction type
+        val newBalance = when (type) {
+            TransactionType.CREDIT, TransactionType.SALARY, 
+            TransactionType.TOPUP, TransactionType.REFUND -> account.currentBalance + amount
+            TransactionType.DEBIT, TransactionType.EXPENSE -> account.currentBalance - amount
+            else -> account.currentBalance
+        }
+        
+        // Get current month and year
+        val calendar = java.util.Calendar.getInstance()
+        val month = calendar.get(java.util.Calendar.MONTH) + 1
+        val year = calendar.get(java.util.Calendar.YEAR)
+        
+        // Create transaction record
+        val transaction = AccountTransaction(
+            accountId = accountId,
+            type = type,
+            amount = amount,
+            balanceAfter = newBalance,
+            description = description,
+            referenceId = referenceId,
+            referenceType = referenceType,
+            timestamp = System.currentTimeMillis(),
+            month = month,
+            year = year
+        )
+        
+        // Insert transaction
+        accountTransactionDao.insert(transaction)
+        
+        // Update account balance
+        updateBankAccountBalance(accountId, newBalance)
+    }
     suspend fun softDeleteBankAccount(accountId: Long) =
         bankAccountDao.softDelete(accountId)
     

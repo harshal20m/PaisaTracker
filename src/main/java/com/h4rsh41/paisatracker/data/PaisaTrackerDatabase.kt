@@ -41,8 +41,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BankNotificationEntity::class,
         UnrecognizedSmsEntity::class,
         MerchantRuleEntity::class,
+        AccountTransaction::class,
     ],
-    version = 15,  // @AI_AGENT_DATABASE_CHECKPOINT - Increment this when changing schema
+    version = 16,  // @AI_AGENT_DATABASE_CHECKPOINT - Increment this when changing schema
     exportSchema = true  // @AI_AGENT_DATABASE_CHECKPOINT - Keep this enabled for tracking
 )
 @TypeConverters(Converters::class)
@@ -60,6 +61,7 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
     abstract fun bankNotificationDao(): BankNotificationDao
     abstract fun unrecognizedSmsDao(): UnrecognizedSmsDao
     abstract fun merchantRuleDao(): MerchantRuleDao
+    abstract fun accountTransactionDao(): AccountTransactionDao
     
     companion object {
         @Volatile
@@ -88,8 +90,9 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                         MIGRATION_11_12,
                         MIGRATION_12_13,
                         MIGRATION_13_14,
-                        MIGRATION_14_15
-                        // Add new migrations here: MIGRATION_15_16, etc.
+                        MIGRATION_14_15,
+                        MIGRATION_15_16
+                        // Add new migrations here: MIGRATION_16_17, etc.
                     )
                     // @AI_AGENT_DATABASE_CHECKPOINT - NEVER uncomment this line!
                     // FORBIDDEN: .fallbackToDestructiveMigration() - This deletes ALL user data!
@@ -549,6 +552,70 @@ abstract class PaisaTrackerDatabase : RoomDatabase() {
                 }
                 
                 android.util.Log.d("Migration_14_15", "Migration 14→15 completed successfully")
+            }
+        }
+        
+        /**
+         * Migration 15→16: Add priority field to bank_accounts and create account_transactions table
+         * 
+         * Changes:
+         * 1. Add priority column to bank_accounts (PRIMARY/SECONDARY)
+         * 2. Create account_transactions table for tracking credits/debits history
+         * 
+         * This migration is SAFE because:
+         * - Uses try-catch for ALTER TABLE (idempotent)
+         * - Uses IF NOT EXISTS for CREATE TABLE
+         * - Provides default value for new column
+         * - Logs all steps for debugging
+         */
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                android.util.Log.d("Migration_15_16", "Starting migration to add account priority and transactions")
+                
+                // Add priority column to bank_accounts
+                try {
+                    database.execSQL(
+                        "ALTER TABLE bank_accounts ADD COLUMN priority TEXT NOT NULL DEFAULT 'SECONDARY'"
+                    )
+                    android.util.Log.d("Migration_15_16", "Added priority column to bank_accounts")
+                } catch (e: Exception) {
+                    android.util.Log.w("Migration_15_16", "Priority column already exists: ${e.message}")
+                }
+                
+                // Create account_transactions table
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS account_transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        accountId INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        balanceAfter REAL NOT NULL,
+                        description TEXT NOT NULL,
+                        referenceId INTEGER,
+                        referenceType TEXT,
+                        timestamp INTEGER NOT NULL,
+                        month INTEGER NOT NULL,
+                        year INTEGER NOT NULL,
+                        FOREIGN KEY(accountId) REFERENCES bank_accounts(id) ON DELETE CASCADE
+                    )
+                """)
+                android.util.Log.d("Migration_15_16", "Created account_transactions table")
+                
+                // Create indices for performance
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_account_transactions_accountId ON account_transactions(accountId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_account_transactions_timestamp ON account_transactions(timestamp)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_account_transactions_type ON account_transactions(type)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_account_transactions_month_year ON account_transactions(month, year)"
+                )
+                
+                android.util.Log.d("Migration_15_16", "Migration 15→16 completed successfully")
             }
         }
         

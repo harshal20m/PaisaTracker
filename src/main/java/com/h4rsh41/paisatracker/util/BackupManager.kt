@@ -235,7 +235,9 @@ class BackupManager(private val context: Context) {
                         PaisaTrackerDatabase.MIGRATION_10_11,
                         PaisaTrackerDatabase.MIGRATION_11_12,
                         PaisaTrackerDatabase.MIGRATION_12_13,
-                        PaisaTrackerDatabase.MIGRATION_13_14
+                        PaisaTrackerDatabase.MIGRATION_13_14,
+                        PaisaTrackerDatabase.MIGRATION_14_15,
+                        PaisaTrackerDatabase.MIGRATION_15_16
                     )
                     .build()
 

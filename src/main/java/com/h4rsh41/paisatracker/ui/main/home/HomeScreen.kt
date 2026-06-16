@@ -47,6 +47,8 @@ import com.h4rsh41.paisatracker.ui.sms.SmsHistoryScanViewModel
 import com.h4rsh41.paisatracker.ui.sms.SmsTransactionViewModel
 import com.h4rsh41.paisatracker.ui.trash.TrashScreen
 import com.h4rsh41.paisatracker.ui.trash.TrashViewModel
+import com.h4rsh41.paisatracker.ui.update.ReleaseNotesCard
+import com.h4rsh41.paisatracker.ui.update.StarRepositoryCard
 import com.h4rsh41.paisatracker.data.Project
 import com.h4rsh41.paisatracker.util.CurrentCurrency
 import com.h4rsh41.paisatracker.viewmodel.AnalyticsViewModel
@@ -106,6 +108,7 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
     val totalExpenses = activeProjects.sumOf { it.expenseCount }
     val recentExpenses by viewModel.recentExpenses.collectAsStateWithLifecycle(initialValue = emptyList())
     val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
+    val showStarRepoCard by viewModel.showStarRepoCard.collectAsStateWithLifecycle()
 
     // ── Sheet state ───────────────────────────────────────────────────────────
     var showAssetsSheet by remember { mutableStateOf(false) }
@@ -184,6 +187,19 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                 contentPadding = PaddingValues(top = 0.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Star Repository Card - Shows once after update
+                item {
+                    StarRepositoryCard(
+                        visible = showStarRepoCard,
+                        onDismiss = {
+                            scope.launch {
+                                viewModel.markStarRepoCardShown()
+                            }
+                        }
+                    )
+                }
+                
+                // Update Available Card with Release Notes
                 item {
                     AnimatedVisibility(
                         visible = updateAvailable != null,
@@ -191,13 +207,13 @@ fun HomeScreen(viewModel: PaisaTrackerViewModel, navController: NavController) {
                         exit = shrinkVertically() + fadeOut()
                     ) {
                         updateAvailable?.let { release ->
-                            UpdateRow(
-                                tagName = release.tag_name,
-                                onClick = {
+                            ReleaseNotesCard(
+                                release = release,
+                                onDismiss = { viewModel.dismissUpdate() },
+                                onDownload = {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(release.html_url))
                                     context.startActivity(intent)
-                                },
-                                onDismiss = { viewModel.dismissUpdate() }
+                                }
                             )
                         }
                     }

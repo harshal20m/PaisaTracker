@@ -46,12 +46,23 @@ data class BankAccount(
     /** Whether this account is active and should be shown in lists */
     val isActive: Boolean = true,
     
+    /** Account priority: PRIMARY or SECONDARY (for organizing accounts) */
+    val priority: String = AccountPriority.SECONDARY,
+    
     /** Timestamp when account was created */
     val createdAt: Long = System.currentTimeMillis(),
     
     /** Last updated timestamp */
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/**
+ * Account priority levels for organizing accounts
+ */
+object AccountPriority {
+    const val PRIMARY = "PRIMARY"       // Main/primary accounts (shown first)
+    const val SECONDARY = "SECONDARY"   // Secondary/backup accounts
+}
 
 /**
  * Predefined account types for consistency
