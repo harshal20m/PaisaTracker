@@ -14,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.h4rsh41.paisatracker.PaisaTrackerApplication
 import com.h4rsh41.paisatracker.PaisaTrackerViewModel
+import com.h4rsh41.paisatracker.data.AnimationPreferencesRepository
 import com.h4rsh41.paisatracker.ui.analytics.AnalyticsScreen
 import com.h4rsh41.paisatracker.ui.bankaccount.BankAccountTransactionScreen
 import com.h4rsh41.paisatracker.ui.common.CalendarTransactionView
@@ -45,7 +46,38 @@ fun AppNavigation(
     viewModel: PaisaTrackerViewModel,
     modifier: Modifier = Modifier,
 ) {
-    NavHost(navController, startDestination = "home", modifier = modifier) {
+    val context = LocalContext.current
+    val animationPrefsRepo = remember { AnimationPreferencesRepository.getInstance(context) }
+    
+    // Collect animation preferences
+    val animationType by animationPrefsRepo.animationType.collectAsStateWithLifecycle(
+        initialValue = com.h4rsh41.paisatracker.data.AnimationType.default()
+    )
+    val animationSpeed by animationPrefsRepo.animationSpeed.collectAsStateWithLifecycle(
+        initialValue = com.h4rsh41.paisatracker.data.AnimationSpeed.default()
+    )
+    val animationsEnabled by animationPrefsRepo.animationsEnabled.collectAsStateWithLifecycle(
+        initialValue = true
+    )
+    
+    // Get the transition spec based on preferences
+    val transitionSpec = remember(animationType, animationSpeed, animationsEnabled) {
+        TransitionProvider.getTransition(
+            type = animationType,
+            speed = animationSpeed,
+            enabled = animationsEnabled
+        )
+    }
+    
+    NavHost(
+        navController = navController,
+        startDestination = "home",
+        modifier = modifier,
+        enterTransition = { transitionSpec.enter },
+        exitTransition = { transitionSpec.exit },
+        popEnterTransition = { transitionSpec.popEnter },
+        popExitTransition = { transitionSpec.popExit }
+    ) {
         composable("home") {
             HomeScreen(viewModel = viewModel, navController = navController)
         }

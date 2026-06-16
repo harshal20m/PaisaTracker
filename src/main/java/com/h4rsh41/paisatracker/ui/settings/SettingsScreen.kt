@@ -63,6 +63,7 @@ fun SettingsScreen(
     var showDefaultDataDialog     by remember { mutableStateOf(false) }
     var showDataManagement        by remember { mutableStateOf(false) }
     var showFlapSettings          by remember { mutableStateOf(false) }
+    var showAnimationSettings     by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -139,6 +140,16 @@ fun SettingsScreen(
                     title    = "Currency",
                     subtitle = "${selectedCurrency.flag} ${selectedCurrency.code}",
                     onClick  = { showCurrencyDialog = true }
+                )
+            }
+
+            // Animation Settings card
+            item {
+                MasonryCard(
+                    icon     = Icons.Default.Animation,
+                    title    = "Page Transitions",
+                    subtitle = "Customize navigation animations",
+                    onClick  = { showAnimationSettings = true }
                 )
             }
 
@@ -345,6 +356,7 @@ fun SettingsScreen(
     if (showDataManagement) ExportBottomSheet(viewModel = viewModel, navController = navController, onDismiss = { showDataManagement = false })
     if (showBatteryDialog)      BatteryOptimizationBottomSheet(onDismiss = { showBatteryDialog = false })
     if (showAboutDialog)        AboutBottomSheet(viewModel = viewModel, onDismiss = { showAboutDialog = false })
+    if (showAnimationSettings)  AnimationSettingsBottomSheet(onDismiss = { showAnimationSettings = false })
     if (showThemeDialog) {
         ThemeSelectionBottomSheet(
             currentTheme     = currentTheme,

@@ -4,8 +4,10 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -18,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.h4rsh41.paisatracker.data.Expense
@@ -26,6 +29,79 @@ import com.h4rsh41.paisatracker.domain.models.YearGroup
 import com.h4rsh41.paisatracker.ui.common.SortDropdown
 import com.h4rsh41.paisatracker.ui.common.SortOption
 import com.h4rsh41.paisatracker.util.formatCurrency
+import kotlin.math.max
+import kotlin.math.min
+
+/**
+ * Scroll Progress Indicator - thin bar at the top that grows with scroll
+ */
+@Composable
+fun ScrollProgressIndicator(
+    listState: LazyListState,
+    modifier: Modifier = Modifier
+) {
+    // Calculate scroll progress (0f to 1f)
+    val scrollProgress by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItemsHeight = layoutInfo.totalItemsCount * 100 // Approximate
+            val visibleItemsHeight = layoutInfo.viewportEndOffset
+            val scrollOffset = listState.firstVisibleItemIndex * 100 + listState.firstVisibleItemScrollOffset
+            
+            if (totalItemsHeight <= visibleItemsHeight) {
+                0f
+            } else {
+                val maxScroll = totalItemsHeight - visibleItemsHeight
+                min(1f, max(0f, scrollOffset.toFloat() / maxScroll))
+            }
+        }
+    }
+    
+    // Only show when scrolled
+    val isScrolled by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+    
+    // Animate visibility
+    val indicatorAlpha by animateFloatAsState(
+        targetValue = if (isScrolled) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "indicatorAlpha"
+    )
+    
+    if (indicatorAlpha > 0f) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .alpha(indicatorAlpha)
+        ) {
+            // Background track
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            )
+            
+            // Progress indicator with gradient
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(scrollProgress)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary
+                            )
+                        )
+                    )
+            )
+        }
+    }
+}
 
 /**
  * Sticky Month Header with background for better visibility
@@ -224,91 +300,99 @@ fun GroupedExpenseListViewWithCollapsingHeader(
         }
     }
     
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Collapsing Summary Header
-        CollapsingSummaryHeader(
-            expenses = expenses,
-            isCollapsed = isHeaderCollapsed,
-            modifier = Modifier.padding(top = 16.dp)
-        )
-        
-        // Always visible controls
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.background,
-            tonalElevation = if (isHeaderCollapsed) 2.dp else 0.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ExpenseViewTypeToggle(
-                    currentViewType = currentViewType,
-                    onViewTypeChange = onViewTypeChange
-                )
-
-                SortDropdown(current = expenseSortOption, onChange = onSortOptionChange)
-            }
-        }
-        
-        // Scrollable content with sticky headers
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Add expense button at top
-            item(key = "ADD_BUTTON") {
-                AddExpenseListItem(onClick = onAddExpenseClick)
-            }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Collapsing Summary Header
+            CollapsingSummaryHeader(
+                expenses = expenses,
+                isCollapsed = isHeaderCollapsed,
+                modifier = Modifier.padding(top = 16.dp)
+            )
             
-            // Iterate through year groups
-            yearGroups.forEachIndexed { yearIndex, yearGroup ->
-                // Year separator (except for first year)
-                if (yearIndex > 0) {
-                    item(key = "YEAR_SEP_${yearGroup.year}") {
-                        YearSeparator(year = yearGroup.year)
+            // Always visible controls
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.background,
+                tonalElevation = if (isHeaderCollapsed) 2.dp else 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ExpenseViewTypeToggle(
+                        currentViewType = currentViewType,
+                        onViewTypeChange = onViewTypeChange
+                    )
+
+                    SortDropdown(current = expenseSortOption, onChange = onSortOptionChange)
+                }
+            }
+        
+            // Scrollable content with sticky headers
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Add expense button at top
+                item(key = "ADD_BUTTON") {
+                    AddExpenseListItem(onClick = onAddExpenseClick)
+                }
+                
+                // Iterate through year groups
+                yearGroups.forEachIndexed { yearIndex, yearGroup ->
+                    // Year separator (except for first year)
+                    if (yearIndex > 0) {
+                        item(key = "YEAR_SEP_${yearGroup.year}") {
+                            YearSeparator(year = yearGroup.year)
+                        }
+                    }
+                    
+                    // Month groups within the year
+                    yearGroup.monthGroups.forEach { monthGroup ->
+                        // Sticky Month header
+                        stickyHeader(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
+                            StickyMonthHeader(monthGroup = monthGroup)
+                        }
+                        
+                        // Expenses in this month
+                        items(
+                            items = monthGroup.expenses,
+                            key = { expense -> "EXP_${expense.id}" }
+                        ) { expense ->
+                            ExpenseListItem(
+                                expense = expense,
+                                onClick = { onExpenseClick(expense) },
+                                onEditClick = { onEditClick(expense) },
+                                onDeleteClick = { onDeleteClick(expense) }
+                            )
+                        }
                     }
                 }
                 
-                // Month groups within the year
-                yearGroup.monthGroups.forEach { monthGroup ->
-                    // Sticky Month header
-                    stickyHeader(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
-                        StickyMonthHeader(monthGroup = monthGroup)
-                    }
-                    
-                    // Expenses in this month
-                    items(
-                        items = monthGroup.expenses,
-                        key = { expense -> "EXP_${expense.id}" }
-                    ) { expense ->
-                        ExpenseListItem(
-                            expense = expense,
-                            onClick = { onExpenseClick(expense) },
-                            onEditClick = { onEditClick(expense) },
-                            onDeleteClick = { onDeleteClick(expense) }
+                // Load more button
+                if (nextYearToLoad != null) {
+                    item(key = "LOAD_MORE") {
+                        LoadMoreYearButton(
+                            year = nextYearToLoad,
+                            isLoading = isLoadingYear,
+                            onClick = onLoadMoreClick,
+                            modifier = Modifier.padding(vertical = 16.dp)
                         )
                     }
                 }
             }
-            
-            // Load more button
-            if (nextYearToLoad != null) {
-                item(key = "LOAD_MORE") {
-                    LoadMoreYearButton(
-                        year = nextYearToLoad,
-                        isLoading = isLoadingYear,
-                        onClick = onLoadMoreClick,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-                }
-            }
         }
+        
+        // Scroll Progress Indicator at the very top
+        ScrollProgressIndicator(
+            listState = listState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
 
@@ -344,112 +428,120 @@ fun GroupedExpenseGridViewWithCollapsingHeader(
         }
     }
     
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Collapsing Summary Header
-        CollapsingSummaryHeader(
-            expenses = expenses,
-            isCollapsed = isHeaderCollapsed,
-            modifier = Modifier.padding(top = 16.dp)
-        )
-        
-        // Always visible controls
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.background,
-            tonalElevation = if (isHeaderCollapsed) 2.dp else 0.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Collapsing Summary Header
+            CollapsingSummaryHeader(
+                expenses = expenses,
+                isCollapsed = isHeaderCollapsed,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            
+            // Always visible controls
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.background,
+                tonalElevation = if (isHeaderCollapsed) 2.dp else 0.dp
             ) {
-                ExpenseViewTypeToggle(
-                    currentViewType = currentViewType,
-                    onViewTypeChange = onViewTypeChange
-                )
-
-                SortDropdown(current = expenseSortOption, onChange = onSortOptionChange)
-            }
-        }
-        
-        // Scrollable grid content with sticky headers
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Add expense button at top (in grid format)
-            item(key = "ADD_BUTTON") {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    AddExpenseGridItem(
-                        onClick = onAddExpenseClick,
-                        modifier = Modifier.weight(1f)
+                    ExpenseViewTypeToggle(
+                        currentViewType = currentViewType,
+                        onViewTypeChange = onViewTypeChange
                     )
-                    Spacer(modifier = Modifier.weight(1f))
+
+                    SortDropdown(current = expenseSortOption, onChange = onSortOptionChange)
                 }
             }
             
-            // Iterate through year groups
-            yearGroups.forEachIndexed { yearIndex, yearGroup ->
-                // Year separator (except for first year)
-                if (yearIndex > 0) {
-                    item(key = "YEAR_SEP_${yearGroup.year}") {
-                        YearSeparator(year = yearGroup.year)
+            // Scrollable grid content with sticky headers
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 180.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Add expense button at top (in grid format)
+                item(key = "ADD_BUTTON") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AddExpenseGridItem(
+                            onClick = onAddExpenseClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
                 
-                // Month groups within the year
-                yearGroup.monthGroups.forEach { monthGroup ->
-                    // Sticky Month header
-                    stickyHeader(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
-                        StickyMonthHeader(monthGroup = monthGroup)
+                // Iterate through year groups
+                yearGroups.forEachIndexed { yearIndex, yearGroup ->
+                    // Year separator (except for first year)
+                    if (yearIndex > 0) {
+                        item(key = "YEAR_SEP_${yearGroup.year}") {
+                            YearSeparator(year = yearGroup.year)
+                        }
                     }
                     
-                    // Expenses in this month (in grid format - 2 columns)
-                    val chunkedExpenses = monthGroup.expenses.chunked(2)
-                    items(
-                        items = chunkedExpenses,
-                        key = { rowExpenses -> "ROW_${rowExpenses.firstOrNull()?.id ?: 0}" }
-                    ) { rowExpenses ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            rowExpenses.forEach { expense ->
-                                ExpenseGridItem(
-                                    expense = expense,
-                                    onClick = { onExpenseClick(expense) },
-                                    onEditClick = { onEditClick(expense) },
-                                    onDeleteClick = { onDeleteClick(expense) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            // Add spacer if only one item in row
-                            if (rowExpenses.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+                    // Month groups within the year
+                    yearGroup.monthGroups.forEach { monthGroup ->
+                        // Sticky Month header
+                        stickyHeader(key = "MONTH_${yearGroup.year}_${monthGroup.month}") {
+                            StickyMonthHeader(monthGroup = monthGroup)
+                        }
+                        
+                        // Expenses in this month (in grid format - 2 columns)
+                        val chunkedExpenses = monthGroup.expenses.chunked(2)
+                        items(
+                            items = chunkedExpenses,
+                            key = { rowExpenses -> "ROW_${rowExpenses.firstOrNull()?.id ?: 0}" }
+                        ) { rowExpenses ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowExpenses.forEach { expense ->
+                                    ExpenseGridItem(
+                                        expense = expense,
+                                        onClick = { onExpenseClick(expense) },
+                                        onEditClick = { onEditClick(expense) },
+                                        onDeleteClick = { onDeleteClick(expense) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                // Add spacer if only one item in row
+                                if (rowExpenses.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
                 }
-            }
-            
-            // Load more button
-            if (nextYearToLoad != null) {
-                item(key = "LOAD_MORE") {
-                    LoadMoreYearButton(
-                        year = nextYearToLoad,
-                        isLoading = isLoadingYear,
-                        onClick = onLoadMoreClick,
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
+                
+                // Load more button
+                if (nextYearToLoad != null) {
+                    item(key = "LOAD_MORE") {
+                        LoadMoreYearButton(
+                            year = nextYearToLoad,
+                            isLoading = isLoadingYear,
+                            onClick = onLoadMoreClick,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    }
                 }
             }
         }
+        
+        // Scroll Progress Indicator at the very top
+        ScrollProgressIndicator(
+            listState = listState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
     }
 }
